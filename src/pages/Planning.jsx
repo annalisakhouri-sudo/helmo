@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle } from 'lucide-react'
 import { addDays, format, startOfWeek, parseISO, isWithinInterval } from 'date-fns'
@@ -42,6 +43,9 @@ const COLORS = {
 
 export default function Planning() {
   const navigate = useNavigate()
+  const { activeBrand } = useOutletContext() || { activeBrand: 'midi-nautisme' }
+  const filteredBoats = BOATS.filter(b => b.brand === activeBrand)
+  const filteredBookings = BOOKINGS.filter(b => b.brand === activeBrand)
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date('2026-07-05')
     return d
@@ -49,7 +53,7 @@ export default function Planning() {
   const [selected, setSelected] = useState(null)
 
   const days = getWeekDays(weekStart)
-  const skipperMissing = BOOKINGS.filter(b => b.needsSkipper && !b.skipperId)
+  const skipperMissing = filteredBookings.filter(b => b.needsSkipper && !b.skipperId)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -105,7 +109,7 @@ export default function Planning() {
           </div>
 
           {/* Lignes bateaux */}
-          {BOATS.map(boat => {
+          {filteredBoats.map(boat => {
             const bookings = getBookingForBoat(boat.id, days)
             return (
               <div key={boat.id} className="grid border-t border-gray-100" style={{ gridTemplateColumns: '100px repeat(7, 1fr)', minHeight: 68 }}>

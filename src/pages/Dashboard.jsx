@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { AlertTriangle, Search, Plus } from 'lucide-react'
 import { BOATS, BOOKINGS } from '@/lib/mock-data'
 import { StatCard, AlertBanner, Card, SectionLabel } from '@/components/ui'
@@ -7,8 +7,7 @@ function getDocAlerts(boats) {
   const alerts = []
   boats.forEach(boat => {
     Object.entries(boat.docs).forEach(([key, doc]) => {
-      if (doc.status === 'danger') alerts.push({ boat: boat.name, key, doc, type: 'danger' })
-      if (doc.status === 'warn') alerts.push({ boat: boat.name, key, doc, type: 'warn' })
+      if (doc.status !== 'ok') alerts.push({ boat: boat.name, key, doc, type: doc.status })
     })
   })
   return alerts.sort((a, b) => (a.type === 'danger' ? -1 : 1))
@@ -18,18 +17,27 @@ const DOC_NAMES = { francisation: 'Francisation', assurance: 'Assurance', securi
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const alerts = getDocAlerts(BOATS)
-  const docMissing = BOATS.reduce((acc, b) =>
+  const { activeBrand, brand } = useOutletContext()
+
+  const boats = BOATS.filter(b => b.brand === activeBrand)
+  const bookings = BOOKINGS.filter(b => b.brand === activeBrand)
+  const alerts = getDocAlerts(boats)
+  const docMissing = boats.reduce((acc, b) =>
     acc + Object.values(b.docs).filter(d => d.status !== 'ok').length, 0)
-  const skipperMissing = BOOKINGS.filter(b => b.needsSkipper && !b.skipperId).length
+  const skipperMissing = bookings.filter(b => b.needsSkipper && !b.skipperId).length
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Topbar */}
       <div className="topbar">
         <div>
-          <h1 className="font-display text-base font-bold">Bonjour, Midi Nautisme</h1>
-          <p className="text-xs text-gray-400">Saison 2026 · Marseille</p>
+          <div className="flex items-center gap-2">
+            <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold font-display text-white ${activeBrand === 'midi-nautisme' ? 'bg-navy-600' : 'bg-teal-400'}`}>
+              {brand.logo}
+            </div>
+            <h1 className="font-display text-base font-bold">{brand.name}</h1>
+            <span className="text-xs text-gray-400">— {brand.tagline}</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5">{brand.port}</p>
         </div>
         <div className="flex gap-2">
           <button className="btn-ghost" onClick={() => navigate('/skippers')}>
@@ -41,21 +49,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-auto p-5">
-        {/* Métriques */}
         <div className="grid grid-cols-4 gap-3 mb-4">
-          <StatCard label="Bateaux actifs" value={BOATS.length} />
+          <StatCard label="Bateaux actifs" value={boats.length} />
           <StatCard label="Alertes docs" value={docMissing} variant={docMissing > 0 ? 'warn' : 'ok'} sub={docMissing > 0 ? 'à régulariser' : 'tout est ok'} />
           <StatCard label="Missions ce mois" value="12" sub="+3 vs juillet" variant="ok" />
           <StatCard label="Skippers manquants" value={skipperMissing} variant={skipperMissing > 0 ? 'warn' : 'ok'} sub={skipperMissing > 0 ? 'locations sans skipper' : 'tout assigné'} />
         </div>
 
-        {/* Alertes */}
         {alerts.length > 0 && (
           <div className="flex flex-col gap-2 mb-5">
             <SectionLabel>Alertes en cours</SectionLabel>
-            {alerts.map((a, i) => (
+            {alerts.slice(0, 4).map((a, i) => (
               <AlertBanner
                 key={i}
                 variant={a.type === 'danger' ? 'danger' : 'warn'}
@@ -69,7 +74,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Accès rapides */}
         <SectionLabel>Accès rapides</SectionLabel>
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
@@ -85,10 +89,10 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Dernières locs */}
         <SectionLabel>Locations cette semaine</SectionLabel>
         <Card>
-          {BOOKINGS.map((b, i) => (
+          {bookings.length === 0 && <p className="text-sm text-gray-400">Aucune location cette semaine.</p>}
+          {bookings.map((b) => (
             <div
               key={b.id}
               className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-4 px-4 rounded transition-colors"

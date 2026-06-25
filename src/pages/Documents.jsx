@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Upload, QrCode, FileText, Shield, Anchor, AlertTriangle, Check, X } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { BOATS, DOC_LABELS } from '@/lib/mock-data'
@@ -93,7 +94,9 @@ function QrModal({ boat, onClose }) {
 
 export default function Documents() {
   const [qrBoat, setQrBoat] = useState(null)
-  const alerts = BOATS.flatMap(b =>
+  const { activeBrand } = useOutletContext() || { activeBrand: 'midi-nautisme' }
+  const filteredBoats = BOATS.filter(b => b.brand === activeBrand)
+  const alerts = filteredBoats.flatMap(b =>
     Object.entries(b.docs)
       .filter(([_, d]) => d.status !== 'ok')
       .map(([key, d]) => ({ boat: b.name, key, doc: d }))
@@ -104,7 +107,7 @@ export default function Documents() {
       <div className="topbar">
         <div>
           <h1 className="font-display text-base font-bold">Documents de la flotte</h1>
-          <p className="text-xs text-gray-400">{BOATS.length} bateaux · {alerts.length} alertes</p>
+          <p className="text-xs text-gray-400">{filteredBoats.length} bateaux · {alerts.length} alertes</p>
         </div>
         <button className="btn-primary"><Upload size={14} /> Uploader un document</button>
       </div>
@@ -129,7 +132,7 @@ export default function Documents() {
 
         <SectionLabel>Flotte complète</SectionLabel>
         <div className="flex flex-col gap-3">
-          {BOATS.map(boat => (
+          {filteredBoats.map(boat => (
             <BoatDocCard key={boat.id} boat={boat} onQr={setQrBoat} />
           ))}
         </div>
