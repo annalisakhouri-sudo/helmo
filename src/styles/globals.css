@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700&family=Inter:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F4F6F9;
+    color: #1a1a2e;
+  }
+  h1, h2, h3, .font-display {
+    font-family: 'Syne', sans-serif;
+  }
+}
+
+@layer components {
+  /* Boutons */
+  .btn-primary {
+    @apply bg-navy-600 text-white px-4 py-2 rounded-lg text-sm font-medium
+           hover:bg-navy-800 transition-colors flex items-center gap-2 cursor-pointer border-0;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-gray-500 px-4 py-2 rounded-lg text-sm
+           border border-gray-200 hover:bg-gray-50 transition-colors
+           flex items-center gap-2 cursor-pointer;
+  }
+  .btn-danger {
+    @apply bg-danger-600 text-white px-4 py-2 rounded-lg text-sm font-medium
+           hover:bg-danger-800 transition-colors flex items-center gap-2 cursor-pointer border-0;
+  }
+
+  /* Pills */
+  .pill-ok      { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-teal-50 text-teal-800; }
+  .pill-warn    { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-800; }
+  .pill-danger  { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-danger-50 text-danger-800; }
+  .pill-blue    { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-navy-50 text-navy-800; }
+  .pill-skipper { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-navy-600 text-navy-50; }
+  .pill-draps   { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-teal-200 text-teal-900; }
+
+  /* Cards */
+  .card { @apply bg-white rounded-xl border border-gray-100 p-4; }
+  .card-sm { @apply bg-gray-50 rounded-lg p-3; }
+
+  /* Section label */
+  .section-label { @apply text-xs font-medium uppercase tracking-widest text-gray-400 mb-2; }
+
+  /* Sidebar nav */
+  .nav-item {
+    @apply flex items-center gap-2.5 px-5 py-2.5 text-xs text-navy-100
+           cursor-pointer border-l-2 border-transparent hover:bg-navy-800 transition-colors;
+  }
+  .nav-item.active {
+    @apply bg-navy-600 text-white border-l-teal-200;
+  }
+
+  /* Topbar */
+  .topbar {
+    @apply bg-white border-b border-gray-100 px-5 py-3
+           flex items-center justify-between flex-shrink-0;
+  }
+
+  /* Alert */
+  .alert-danger {
+    @apply flex items-center gap-3 bg-danger-50 border border-danger-100
+           rounded-lg p-3 cursor-pointer;
+  }
+  .alert-warn {
+    @apply flex items-center gap-3 bg-amber-50 border border-amber-100
+           rounded-lg p-3;
+  }
+
+  /* Avatar */
+  .avatar {
+    @apply w-9 h-9 rounded-full flex items-center justify-center
+           text-xs font-medium flex-shrink-0;
+  }
+}
