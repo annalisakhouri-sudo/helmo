@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import Messagerie from './Messagerie'
+import ReservationModal from '@/components/skippers/ReservationModal'
 import { Search, Star, MessageCircle, CalendarPlus, X, Check, Shield } from 'lucide-react'
 import { SKIPPERS } from '@/lib/mock-data'
 import { Card, SectionLabel, Avatar } from '@/components/ui'
@@ -16,6 +18,8 @@ function Stars({ rating }) {
 }
 
 function SkipperDetail({ skipper, onClose }) {
+  const [showMsg, setShowMsg] = useState(false)
+  const [showResa, setShowResa] = useState(false)
   const july = Array.from({ length: 31 }, (_, i) => {
     const d = `2026-07-${String(i+1).padStart(2, '0')}`
     return { day: i+1, busy: skipper.availability.busy.includes(d) }
@@ -106,10 +110,12 @@ function SkipperDetail({ skipper, onClose }) {
         </div>
 
         <div className="border-t border-gray-100 p-4 flex gap-2">
-          <button className="btn-primary flex-1 justify-center"><CalendarPlus size={14} /> Réserver pour une mission</button>
-          <button className="btn-ghost flex-1 justify-center"><MessageCircle size={14} /> Contacter</button>
+          <button className="btn-primary flex-1 justify-center" onClick={() => setShowResa(true)}><CalendarPlus size={14} /> Réserver pour une mission</button>
+          <button className="btn-ghost flex-1 justify-center" onClick={() => setShowMsg(true)}><MessageCircle size={14} /> Contacter</button>
         </div>
       </div>
+      {showMsg && <Messagerie initialSkipper={skipper} onClose={() => setShowMsg(false)} />}
+      {showResa && <ReservationModal skipper={skipper} onClose={() => setShowResa(false)} />}
     </div>
   )
 }

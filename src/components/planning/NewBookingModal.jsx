@@ -1,6 +1,26 @@
 import { useState } from 'react'
 import { X, AlertTriangle, Check, CircleCheck } from 'lucide-react'
-import { BOATS, SKIPPERS } from '@/lib/mock-data'
+import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES } from '@/lib/mock-data'
+import OptionIcon from '@/components/ui/OptionIcon'
+import DateRangePicker from './DateRangePicker'
+
+// Trouve la période tarifaire correspondant à une date, et calcule le prix de location
+// en fonction du bateau et du nombre de semaines.
+function findPeriod(dateStr) {
+  if (!dateStr) return null
+  return PRICING_PERIODS.find(p => dateStr >= p.start && dateStr <= p.end) || null
+}
+
+function computeBasePrice(boatId, dateStart, dateEnd) {
+  if (!boatId || !dateStart || !dateEnd) return null
+  const period = findPeriod(dateStart)
+  if (!period) return null
+  const weeklyPrice = BOAT_PRICES[boatId]?.[period.id]
+  if (!weeklyPrice) return null
+  const days = Math.max(1, Math.round((new Date(dateEnd) - new Date(dateStart)) / (1000 * 60 * 60 * 24)))
+  const weeks = days / 7
+  return { period, weeklyPrice, total: Math.round(weeklyPrice * weeks) }
+}
 
 const STEPS = [
   { id: 1, label: 'Bateau & dates', icon: '⛵' },
@@ -9,16 +29,7 @@ const STEPS = [
   { id: 4, label: 'Récap', icon: '✓' },
 ]
 
-const OPTIONS = [
-  { id: 'skipper', label: 'Skipper', icon: 'ti-anchor', hasSub: true },
-  { id: 'draps', label: 'Draps & linge', icon: 'ti-shirt', hasSub: true },
-  { id: 'carbu', label: 'Carburant inclus', icon: 'ti-gas-station', hasSub: false },
-  { id: 'sup', label: 'SUP', icon: 'ti-ripple', hasSub: true },
-  { id: 'annexe', label: 'Annexe / zodiac', icon: 'ti-sailboat', hasSub: false },
-  { id: 'taud', label: 'Taud de soleil', icon: 'ti-sun', hasSub: false },
-  { id: 'masque', label: 'Masque & tuba', icon: 'ti-scuba-mask', hasSub: true },
-  { id: 'franchise', label: 'Franchise', icon: 'ti-shield-check', hasSub: true },
-]
+const OPTIONS = OPTIONS_CATALOG.filter(o => o.active)
 
 function Field({ label, required, error, children }) {
   return (
@@ -48,18 +59,44 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
   const [form, setForm] = useState({
     boatId: '', dateStart: '', dateEnd: '', guests: '',
     nom: '', prenom: '', tel: '', email: '',
-    options: {},
-    skipperName: '', cabines: '3', supQty: '2', masqueQty: '3', franchise: '1500',
+    options: {}, freeOptions: {}, basePrice: '', basePriceAuto: null, discountPercent: '0',
+    skipperName: '', cabines: '3', supQty: '2', masqueQty: '3', franchise: '1500', statut: 'confirmed', dureeOption: '48h', lastNightAboard: true,
   })
 
   function set(key, val) {
-    setForm(f => ({ ...f, [key]: val }))
+    setForm(f => {
+      const next = { ...f, [key]: val }
+      // Recalcul automatique du prix de base dès que le bateau ou les dates changent
+      if (['boatId', 'dateStart', 'dateEnd'].includes(key)) {
+        const computed = computeBasePrice(next.boatId, next.dateStart, next.dateEnd)
+        if (computed) {
+          next.basePriceAuto = computed
+          // On ne remplace le prix manuel que s'il n'a pas été modifié à la main,
+          // ou si le bateau/dates viennent de changer
+          next.basePrice = String(computed.total)
+        }
+      }
+      return next
+    })
     if (errors[key]) setErrors(e => ({ ...e, [key]: '' }))
   }
 
   function toggleOpt(id) {
     setForm(f => ({ ...f, options: { ...f.options, [id]: !f.options[id] } }))
     if (id === 'franchise' && errors.franchise) setErrors(e => ({ ...e, franchise: '' }))
+    // Si on décoche une option, on retire aussi son statut "offerte"
+    setForm(f => {
+      if (f.options[id]) {
+        const nextFree = { ...f.freeOptions }
+        delete nextFree[id]
+        return { ...f, freeOptions: nextFree }
+      }
+      return f
+    })
+  }
+
+  function toggleFree(id) {
+    setForm(f => ({ ...f, freeOptions: { ...f.freeOptions, [id]: !f.freeOptions[id] } }))
   }
 
   function validate1() {
@@ -67,7 +104,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
     if (!form.boatId) e.boatId = 'Sélectionne un bateau.'
     if (!form.dateStart) e.dateStart = 'Date de début requise.'
     if (!form.dateEnd) e.dateEnd = 'Date de fin requise.'
-    else if (form.dateEnd <= form.dateStart) e.dateEnd = 'La date de fin doit être après le début.'
+    else if (form.dateEnd < form.dateStart) e.dateEnd = 'La date de fin doit être après le début.'
     if (!form.guests) e.guests = 'Indique le nombre de personnes à bord.'
     setErrors(e)
     setGlobalError(Object.keys(e).length > 0)
@@ -109,6 +146,10 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
       status: form.options.skipper ? 'confirmed' : 'confirmed',
       color: 'teal',
       options: form.options,
+      freeOptions: form.freeOptions,
+      basePrice: parseFloat(form.basePrice) || 0,
+      discountPercent: parseFloat(form.discountPercent) || 0,
+      lastNightAboard: form.lastNightAboard,
     })
     setDone(true)
   }
@@ -120,6 +161,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
 
   const boat = BOATS.find(b => b.id === form.boatId)
   const selectedOpts = OPTIONS.filter(o => form.options[o.id])
+  const optionsTotal = selectedOpts.reduce((acc, o) => acc + (form.freeOptions[o.id] ? 0 : (o.price || 0)), 0)
 
   if (done) return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6">
@@ -188,22 +230,130 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
                   {boats.map(b => <option key={b.id} value={b.id}>{b.name} — {b.type} {b.length}m</option>)}
                 </select>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Date de début" required error={errors.dateStart}>
-                  <input type="date" className={inputClass('dateStart')} value={form.dateStart} onChange={e => set('dateStart', e.target.value)} />
-                </Field>
-                <Field label="Date de fin" required error={errors.dateEnd}>
-                  <input type="date" className={inputClass('dateEnd')} value={form.dateEnd} onChange={e => set('dateEnd', e.target.value)} />
-                </Field>
-              </div>
+
+              <Field label="Nuitée à bord (dernière nuit avant restitution)">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: true, label: 'Oui', sub: 'Dort à bord vendredi soir, part samedi ~10h' },
+                    { id: false, label: 'Non', sub: 'Rend le bateau vendredi soir' },
+                  ].map(opt => (
+                    <div
+                      key={String(opt.id)}
+                      className={`border rounded-xl p-3 cursor-pointer transition-all ${form.lastNightAboard === opt.id ? 'border-navy-600 bg-navy-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      onClick={() => set('lastNightAboard', opt.id)}
+                    >
+                      <p className={`text-sm font-medium ${form.lastNightAboard === opt.id ? 'text-navy-800' : ''}`}>{opt.label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{opt.sub}</p>
+                    </div>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label="Dates de location" required error={errors.dateStart || errors.dateEnd}>
+                <DateRangePicker
+                  brand={activeBrand}
+                  dateStart={form.dateStart}
+                  dateEnd={form.dateEnd}
+                  lastNightAboard={form.lastNightAboard}
+                  onChange={({ dateStart, dateEnd }) => {
+                    set('dateStart', dateStart)
+                    if (dateEnd) set('dateEnd', dateEnd)
+                  }}
+                />
+              </Field>
+
               <Field label="Personnes à bord" required error={errors.guests}>
                 <select className={inputClass('guests')} value={form.guests} onChange={e => set('guests', e.target.value)}>
                   <option value="">-- Nombre de personnes --</option>
                   {[1,2,3,4,5,6,7,8].map(n => <option key={n}>{n} personne{n > 1 ? 's' : ''}</option>)}
                 </select>
               </Field>
+
+              {form.boatId && form.dateStart && form.dateEnd && (
+                <Field label="Prix de la location">
+                  {form.basePriceAuto ? (
+                    <div className="bg-navy-50 border border-navy-100 rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: form.basePriceAuto.period.color }} />
+                          <span className="text-xs text-navy-700">{form.basePriceAuto.period.label} · {form.basePriceAuto.weeklyPrice}€/semaine</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] text-gray-400 mb-1">Prix (€)</p>
+                          <input
+                            type="number"
+                            className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-navy-600"
+                            value={form.basePrice}
+                            onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 mb-1">Remise (%)</p>
+                          <input
+                            type="number"
+                            min="0" max="100"
+                            className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-navy-600"
+                            value={form.discountPercent}
+                            onChange={e => setForm(f => ({ ...f, discountPercent: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      {parseFloat(form.discountPercent) > 0 && (
+                        <p className="text-xs text-teal-700 mt-2 font-medium">
+                          Prix net : {Math.round(parseFloat(form.basePrice || 0) * (1 - parseFloat(form.discountPercent || 0) / 100))}€
+                          <span className="text-gray-400 font-normal"> (remise visible sur le devis client)</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+                      Aucun tarif défini pour ce bateau sur cette période. <a href="/options" className="underline">Configurer les tarifs →</a>
+                    </div>
+                  )}
+                </Field>
+              )}
             </div>
           )}
+
+                    {/* Statut */}
+            <Field label="Statut de la réservation" required>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'confirmed', label: '✅ Confirmée', sub: 'La loc est ferme' },
+                  { id: 'option', label: '⏳ Option', sub: 'Créneau réservé temporairement' },
+                ].map(s => (
+                  <div
+                    key={s.id}
+                    className={`border rounded-xl p-3 cursor-pointer transition-all ${form.statut === s.id ? 'border-navy-600 bg-navy-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    onClick={() => set('statut', s.id)}
+                  >
+                    <p className={`text-sm font-medium ${form.statut === s.id ? 'text-navy-800' : ''}`}>{s.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+                  </div>
+                ))}
+              </div>
+              {form.statut === 'option' && (
+                <div className="mt-3">
+                  <p className="text-xs text-gray-400 mb-1.5">Durée de l'option</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['24h', '48h', '3 jours', '7 jours'].map(d => (
+                      <div
+                        key={d}
+                        className={`border rounded-lg py-2 text-center text-xs cursor-pointer transition-all ${form.dureeOption === d ? 'border-navy-600 bg-navy-50 text-navy-800 font-medium' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                        onClick={() => set('dureeOption', d)}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    ⏳ L'option sera automatiquement annulée après {form.dureeOption} si non confirmée.
+                  </p>
+                </div>
+              )}
+            </Field>
 
           {/* ÉTAPE 2 */}
           {step === 2 && (
@@ -235,12 +385,30 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <i className={`ti ${opt.icon} text-navy-600`} style={{ fontSize: 16 }} aria-hidden="true" />
+                      <OptionIcon name={opt.icon} size={16} className="text-navy-600" />
                       <span className={`text-sm font-medium ${form.options[opt.id] ? 'text-navy-800' : ''}`}>{opt.label}</span>
                     </div>
                     <div className={`w-4 h-4 rounded flex items-center justify-center transition-all ${form.options[opt.id] ? 'bg-navy-600 border-navy-600' : 'border border-gray-300'}`}>
                       {form.options[opt.id] && <Check size={10} className="text-white" />}
                     </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-[11px] text-gray-400">
+                      {form.freeOptions[opt.id]
+                        ? <span className="text-teal-600 font-medium line-through decoration-1">{opt.price}€ {opt.unit}</span>
+                        : `${opt.price}€ ${opt.unit}`
+                      }
+                      {form.freeOptions[opt.id] && <span className="text-teal-600 font-medium ml-1.5">Offert</span>}
+                    </p>
+                    {form.options[opt.id] && (
+                      <button
+                        type="button"
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${form.freeOptions[opt.id] ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        onClick={e => { e.stopPropagation(); toggleFree(opt.id) }}
+                      >
+                        {form.freeOptions[opt.id] ? '✓ Offerte' : 'Offrir'}
+                      </button>
+                    )}
                   </div>
 
                   {form.options[opt.id] && opt.hasSub && (
@@ -299,13 +467,57 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
                   </div>
                 ))}
               </div>
+              {parseFloat(form.basePrice) > 0 && (
+                <>
+                  <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">Prix de la location</p>
+                  <div className="card mb-4 py-1 px-4">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-50 text-sm">
+                      <span className="text-gray-600">Prix de base</span>
+                      <span className="font-medium text-navy-600">{form.basePrice}€</span>
+                    </div>
+                    {parseFloat(form.discountPercent) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-gray-50 text-sm">
+                        <span className="text-gray-600">Remise</span>
+                        <span className="font-medium text-teal-600">-{form.discountPercent}%</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center py-2 text-sm font-semibold">
+                      <span>Prix net location</span>
+                      <span className="text-navy-600">{Math.round(parseFloat(form.basePrice || 0) * (1 - parseFloat(form.discountPercent || 0) / 100))}€</span>
+                    </div>
+                  </div>
+                </>
+              )}
               <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">Options</p>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {selectedOpts.length > 0
-                  ? selectedOpts.map(o => <span key={o.id} className="pill-ok">{o.label}</span>)
-                  : <span className="text-xs text-gray-400">Aucune option sélectionnée</span>
-                }
-              </div>
+              {selectedOpts.length > 0 ? (
+                <div className="card mb-4 py-1 px-4">
+                  {selectedOpts.map(o => (
+                    <div key={o.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 text-sm">
+                      <span className="text-gray-600">{o.label}{form.freeOptions[o.id] && <span className="text-teal-600 text-xs ml-1.5">(offerte)</span>}</span>
+                      {form.freeOptions[o.id]
+                        ? <span className="font-medium text-teal-600">Offert</span>
+                        : <span className="font-medium text-navy-600">{o.price}€ <span className="text-[10px] text-gray-400">{o.unit}</span></span>
+                      }
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center py-2 text-sm font-semibold">
+                    <span>Total options</span>
+                    <span className="text-navy-600">{optionsTotal}€</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 mb-4">Aucune option sélectionnée</p>
+              )}
+
+              {(parseFloat(form.basePrice) > 0 || optionsTotal > 0) && (
+                <div className="flex items-center justify-between bg-navy-900 rounded-xl p-4 mb-4">
+                  <span className="text-sm font-medium text-white">Total général</span>
+                  <span className="font-display text-xl font-bold text-white">
+                    {Math.round(parseFloat(form.basePrice || 0) * (1 - parseFloat(form.discountPercent || 0) / 100)) + optionsTotal}€
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-lg p-3 text-sm text-teal-800">
                 <Check size={14} className="flex-shrink-0 text-teal-600" />
                 Apparaîtra immédiatement dans le planning une fois confirmée.

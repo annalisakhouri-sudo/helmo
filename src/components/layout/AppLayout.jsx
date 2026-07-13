@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, Calendar, FileText, Users, Star, Wrench, Anchor
+  LayoutDashboard, Calendar, FileText, Users, Star, Wrench,
+  Anchor, UserCircle, MessageCircle, LogOut, Tag
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { BRANDS } from '@/lib/mock-data'
@@ -12,7 +13,7 @@ const NAV = [
     items: [
       { to: '/', label: 'Vue d\'ensemble', icon: LayoutDashboard },
       { to: '/planning', label: 'Planning', icon: Calendar },
-      { to: '/documents', label: 'Documents', icon: FileText },
+      { to: '/clients', label: 'Clients', icon: UserCircle },
     ],
   },
   {
@@ -20,6 +21,7 @@ const NAV = [
     items: [
       { to: '/skippers', label: 'Trouver un skipper', icon: Users },
       { to: '/mes-skippers', label: 'Mes skippers', icon: Star },
+      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle },
     ],
   },
   {
@@ -27,13 +29,12 @@ const NAV = [
     items: [
       { to: '/techniciens', label: 'Techniciens', icon: Wrench },
       { to: '/bateaux', label: 'Mes bateaux', icon: Anchor },
+      { to: '/options', label: 'Options & tarifs', icon: Tag },
     ],
   },
 ]
 
-export const BrandContext = { current: 'midi-nautisme' }
-
-export default function AppLayout() {
+export default function AppLayout({ user, onLogout }) {
   const [activeBrand, setActiveBrand] = useState('midi-nautisme')
   const brand = BRANDS[activeBrand]
 
@@ -41,14 +42,14 @@ export default function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <aside className="w-48 bg-navy-900 flex flex-col flex-shrink-0">
 
-        {/* Logo Helmo */}
+        {/* Logo */}
         <div className="px-5 py-4 border-b border-navy-800">
           <span className="font-display text-white text-lg font-bold tracking-tight">
             Hel<span className="text-teal-200">mo</span>
           </span>
         </div>
 
-        {/* Switch de marque */}
+        {/* Switch marque */}
         <div className="px-3 py-3 border-b border-navy-800">
           <p className="text-[9px] font-medium uppercase tracking-widest text-navy-100 opacity-50 mb-2 px-2">Marque active</p>
           <div className="flex flex-col gap-1.5">
@@ -58,25 +59,17 @@ export default function AppLayout() {
                 onClick={() => setActiveBrand(b.id)}
                 className={clsx(
                   'flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all',
-                  activeBrand === b.id
-                    ? 'bg-white/10 border border-white/20'
-                    : 'hover:bg-white/5 border border-transparent'
+                  activeBrand === b.id ? 'bg-white/10 border border-white/20' : 'hover:bg-white/5 border border-transparent'
                 )}
               >
-                {/* Logo initiales */}
-                <div className={clsx(
-                  'w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 font-display',
-                  b.id === 'midi-nautisme' ? 'bg-navy-600 text-white' : 'bg-teal-400 text-white'
-                )}>
+                <div className={clsx('w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 font-display', b.id === 'midi-nautisme' ? 'bg-navy-600 text-white' : 'bg-teal-400 text-white')}>
                   {b.logo}
                 </div>
                 <div className="min-w-0">
                   <p className={clsx('text-xs font-medium truncate', activeBrand === b.id ? 'text-white' : 'text-navy-100')}>{b.name}</p>
                   <p className="text-[9px] text-navy-100 opacity-50 truncate">{b.tagline}</p>
                 </div>
-                {activeBrand === b.id && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-200 flex-shrink-0 ml-auto" />
-                )}
+                {activeBrand === b.id && <div className="w-1.5 h-1.5 rounded-full bg-teal-200 flex-shrink-0 ml-auto" />}
               </button>
             ))}
           </div>
@@ -86,45 +79,42 @@ export default function AppLayout() {
         <nav className="flex-1 overflow-y-auto pb-4 pt-2">
           {NAV.map(({ section, items }) => (
             <div key={section}>
-              <p className="px-5 pt-3 pb-1 text-[9px] font-medium uppercase tracking-widest text-navy-100 opacity-40">
-                {section}
-              </p>
+              <p className="px-5 pt-3 pb-1 text-[9px] font-medium uppercase tracking-widest text-navy-100 opacity-40">{section}</p>
               {items.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={to === '/'}
-                  className={({ isActive }) => clsx('nav-item', isActive && 'active')}
-                >
-                  <Icon size={14} />
-                  <span>{label}</span>
+                <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+                  <Icon size={14} /><span>{label}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
 
-        {/* Pied de sidebar */}
-        <div className="border-t border-navy-800 px-4 py-3">
-          <div className={clsx(
-            'flex items-center gap-2 px-2 py-1.5 rounded-lg',
-            activeBrand === 'midi-nautisme' ? 'bg-navy-800' : 'bg-teal-900/30'
-          )}>
-            <div className={clsx(
-              'w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold font-display flex-shrink-0',
-              activeBrand === 'midi-nautisme' ? 'bg-navy-600 text-white' : 'bg-teal-400 text-white'
-            )}>
-              {brand.logo}
+        {/* Footer — user + logout */}
+        <div className="border-t border-navy-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold font-display text-white flex-shrink-0"
+              style={{ background: brand?.accent || '#185FA5' }}
+            >
+              {brand?.logo}
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] text-white font-medium truncate">{brand.name}</p>
-              <p className="text-[9px] text-navy-100 opacity-50 truncate">{brand.port.split(',')[0]}</p>
+              <p className="text-xs text-white font-medium truncate">{brand?.name}</p>
+              <p className="text-[10px] text-navy-100 opacity-50 capitalize">{user?.role || 'agence'}</p>
             </div>
           </div>
+          <button
+            onClick={onLogout}
+            className="text-navy-100 hover:text-white transition-colors flex-shrink-0 ml-2 p-1 rounded hover:bg-navy-800"
+            title="Se déconnecter"
+          >
+            <LogOut size={14} />
+          </button>
         </div>
+
       </aside>
 
-      {/* Main — on passe la marque active via context */}
+      {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <Outlet context={{ activeBrand, brand }} />
       </main>
