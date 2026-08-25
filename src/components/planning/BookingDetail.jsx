@@ -4,12 +4,13 @@ import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck,
 import { TECHNICIANS, BOATS } from '@/lib/mock-data'
 import { Card, SectionLabel, ProgressBar } from '@/components/ui'
 import CheckIn from './CheckIn'
-import { getState, subscribe, completeCheckIn } from '@/lib/shared-state'
+import { getState, subscribe, completeCheckIn, getMaintenanceTasks } from '@/lib/shared-state'
+import { ALL_ITEMS } from './MaintenanceModal'
 
 const DOC_ICONS = { francisation: FileText, assurance: Shield, securite: Anchor, jauge: Anchor }
 const DOC_NAMES = { francisation: 'Francisation', assurance: 'Assurance', securite: 'Carnet sécurité', jauge: 'Jauge' }
 
-export default function BookingDetail({ booking, onClose, onFindSkipper, onViewDocs, onViewClientDocs, onViewClient, onBookingChange }) {
+export default function BookingDetail({ booking, context = 'depart', onClose, onFindSkipper, onViewDocs, onViewClientDocs, onViewClient, onBookingChange }) {
   const boat = BOATS.find(b => b.id === booking.boatId)
   const techs = TECHNICIANS.filter(t => t.assignedBoats.includes(booking.boatId))
   const [showCheckIn, setShowCheckIn] = useState(false)
@@ -19,7 +20,7 @@ export default function BookingDetail({ booking, onClose, onFindSkipper, onViewD
   React.useEffect(() => {
     return subscribe(state => setSharedState(state))
   }, [])
-  const [checkInDone, setCheckInDone] = useState(false)
+  const checkInDone = !!sharedState.checkIns[booking.id]?.done
 
   function setClientAsSkipper() {
     booking.skipperName = booking.client
@@ -130,10 +131,44 @@ export default function BookingDetail({ booking, onClose, onFindSkipper, onViewD
                 )}
               </div>
 
-              {/* Bouton Check-in */}
+              {/* État des lieux : check-in au départ, check-out (lecture seule) au retour */}
               <div>
                 <SectionLabel>État des lieux</SectionLabel>
-                {checkInDone ? (
+                {context === 'retour' ? (
+                  (() => {
+                    const stored = getMaintenanceTasks(booking.id, ALL_ITEMS.map(i => ({ id: i.id, qty: i.max, max: i.max })), [])
+                    const anomalyDetails = stored.anomalyDetails || {}
+                    const missingItems = ALL_ITEMS.filter(i => {
+                      const item = stored.arrival.find(t => t.id === i.id)
+                      return item && item.qty < i.max && !anomalyDetails[i.id]?.dismissed
+                    })
+                    const okCount = ALL_ITEMS.length - missingItems.length
+                    const pct = Math.round((okCount / ALL_ITEMS.length) * 100)
+                    const started = stored.arrival.some(t => t.qty !== ALL_ITEMS.find(i => i.id === t.id)?.max)
+                    if (!started) {
+                      return (
+                        <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                          <ClipboardCheck size={18} className="text-gray-400 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Check-out non commencé</p>
+                            <p className="text-xs text-gray-400">À effectuer par le technicien au retour du bateau</p>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div className={`flex items-center gap-2.5 rounded-xl p-3 border ${missingItems.length > 0 ? 'bg-amber-50 border-amber-100' : 'bg-teal-50 border-teal-100'}`}>
+                        <CircleCheck size={18} className={missingItems.length > 0 ? 'text-amber-600' : 'text-teal-600'} />
+                        <div>
+                          <p className={`text-sm font-medium ${missingItems.length > 0 ? 'text-amber-800' : 'text-teal-800'}`}>Check-out {pct}% effectué</p>
+                          <p className={`text-xs ${missingItems.length > 0 ? 'text-amber-700' : 'text-teal-700'}`}>
+                            {missingItems.length > 0 ? `${missingItems.length} écart${missingItems.length > 1 ? 's' : ''} signalé${missingItems.length > 1 ? 's' : ''}` : 'Aucun écart signalé'}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })()
+                ) : checkInDone ? (
                   <div className="flex items-center gap-2.5 bg-teal-50 border border-teal-100 rounded-xl p-3">
                     <CircleCheck size={18} className="text-teal-600 flex-shrink-0" />
                     <div>
@@ -211,7 +246,7 @@ export default function BookingDetail({ booking, onClose, onFindSkipper, onViewD
         <CheckIn
           booking={booking}
           onClose={() => setShowCheckIn(false)}
-          onComplete={() => { setCheckInDone(true); setShowCheckIn(false) }}
+          onComplete={() => { setShowCheckIn(false) }}
         />
       )}
     </>

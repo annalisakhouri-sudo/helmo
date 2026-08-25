@@ -49,7 +49,7 @@ function MovementRow({ booking, date, type, onSelect }) {
     <div
       className="flex items-center gap-3 pl-2 pr-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors border-l-2"
       style={{ borderColor: accent }}
-      onClick={() => onSelect(booking)}
+      onClick={() => onSelect(booking, type)}
     >
       <div
         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
@@ -122,6 +122,7 @@ export default function Dashboard() {
   const { activeBrand, brand } = useOutletContext()
   const [listModal, setListModal] = useState(null) // 'departs' | 'retours' | null
   const [selectedBooking, setSelectedBooking] = useState(null)
+  const [selectedContext, setSelectedContext] = useState('depart')
   const [gapInfo, setGapInfo] = useState(null) // { boat, booking, nextBooking } → fiche maintenance
   const [, forceDashboardUpdate] = useState(0) // force le recalcul des alertes après mutation d'un booking
 
@@ -174,6 +175,7 @@ export default function Dashboard() {
       setGapInfo({ boat, booking: b, nextBooking })
     } else {
       setSelectedBooking(b)
+      setSelectedContext('retour')
     }
   }
 
@@ -234,7 +236,7 @@ export default function Dashboard() {
                 <div
                   key={b.id}
                   className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => setSelectedBooking(b)}
+                  onClick={() => { setSelectedBooking(b); setSelectedContext('depart') }}
                 >
                   <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -256,7 +258,7 @@ export default function Dashboard() {
             weekStart={currentWeekStart}
             weekEnd={currentWeekEnd}
             bookings={bookings}
-            onSelect={setSelectedBooking}
+            onSelect={(b, type) => { setSelectedBooking(b); setSelectedContext(type) }}
           />
           <WeekMovements
             title="Semaine prochaine"
@@ -264,7 +266,7 @@ export default function Dashboard() {
             weekStart={nextWeekStart}
             weekEnd={nextWeekEnd}
             bookings={bookings}
-            onSelect={setSelectedBooking}
+            onSelect={(b, type) => { setSelectedBooking(b); setSelectedContext(type) }}
             muted
           />
         </div>
@@ -287,7 +289,7 @@ export default function Dashboard() {
                 <div
                   key={b.id}
                   className="card-sm cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => { setListModal(null); setSelectedBooking(b) }}
+                  onClick={() => { setListModal(null); setSelectedBooking(b); setSelectedContext(listModal === 'retours' ? 'retour' : 'depart') }}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -307,6 +309,7 @@ export default function Dashboard() {
       {selectedBooking && (
         <BookingDetail
           booking={selectedBooking}
+          context={selectedContext}
           onClose={() => setSelectedBooking(null)}
           onFindSkipper={() => { setSelectedBooking(null); navigate('/skippers') }}
           onViewDocs={() => { setSelectedBooking(null); navigate('/bateaux') }}

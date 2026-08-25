@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, ChevronDown, ChevronUp, X, PenLine, CircleCheck, AlertTriangle, FileText } from 'lucide-react'
+import { completeCheckIn } from '@/lib/shared-state'
 
 const CHECKLIST = [
   {
@@ -234,7 +235,7 @@ export default function CheckIn({ booking, onClose, onComplete }) {
             <button
               className={`btn-primary flex-1 justify-center ${!signature ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={!signature}
-              onClick={() => setStep('done')}
+              onClick={() => { completeCheckIn(booking.id, { remarks, missing, checkedCount: done, total }); setStep('done') }}
             >
               <CircleCheck size={14} /> Valider le check-in
             </button>
