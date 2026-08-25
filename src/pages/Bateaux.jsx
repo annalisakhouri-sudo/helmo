@@ -109,6 +109,7 @@ function BoatDetail({ boat, onClose, onUpdateDoc, onViewDoc }) {
                 ['Port', boat.port],
                 ['Immat.', boat.immat || 'FR-12345-A'],
                 ['Cabines', boat.cabines || '3'],
+                ['Lits', boat.lits ?? (boat.cabines ? boat.cabines * 2 : 0)],
                 ['Capacité', `${boat.capacite || 6} pers.`],
               ].map(([label, val]) => (
                 <div key={label} className="bg-gray-50 rounded-lg p-2.5">
@@ -176,7 +177,7 @@ function NewBoatModal({ onClose, onAdd, activeBrand }) {
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
   const [form, setForm] = useState({
-    nom: '', type: '', modele: '', longueur: '', cabines: '', capacite: '',
+    nom: '', type: '', modele: '', longueur: '', cabines: '', lits: '', capacite: '',
     port: '', immat: '', equipements: [],
   })
   const [docs, setDocs] = useState({ francisation: '', assurance: '', securite: '', jauge: '' })
@@ -208,6 +209,7 @@ function NewBoatModal({ onClose, onAdd, activeBrand }) {
       modele: form.modele,
       length: parseFloat(form.longueur) || 0,
       cabines: form.cabines,
+      lits: form.lits || (form.cabines ? form.cabines * 2 : 0),
       capacite: form.capacite,
       port: form.port,
       immat: form.immat,
@@ -234,7 +236,7 @@ function NewBoatModal({ onClose, onAdd, activeBrand }) {
         <p className="text-sm text-gray-400 mb-6">Il apparaît maintenant dans votre flotte et dans le planning.</p>
         <div className="flex gap-3">
           <button className="btn-primary flex-1 justify-center" onClick={onClose}>Voir la flotte</button>
-          <button className="btn-ghost flex-1 justify-center" onClick={() => { setDone(false); setStep(0); setForm({nom:'',type:'',modele:'',longueur:'',cabines:'',capacite:'',port:'',immat:'',equipements:[]}) }}>
+          <button className="btn-ghost flex-1 justify-center" onClick={() => { setDone(false); setStep(0); setForm({nom:'',type:'',modele:'',longueur:'',cabines:'',lits:'',capacite:'',port:'',immat:'',equipements:[]}) }}>
             + Autre bateau
           </button>
         </div>
@@ -286,7 +288,7 @@ function NewBoatModal({ onClose, onAdd, activeBrand }) {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-4 gap-3 mb-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Longueur (m) <span className="text-danger-600">*</span></p>
                   <input className={inp('longueur')} type="number" placeholder="10.5" value={form.longueur} onChange={e => set('longueur', e.target.value)} />
@@ -296,9 +298,17 @@ function NewBoatModal({ onClose, onAdd, activeBrand }) {
                   <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Cabines <span className="text-danger-600">*</span></p>
                   <select className={inp('cabines')} value={form.cabines} onChange={e => set('cabines', e.target.value)}>
                     <option value="">—</option>
-                    {[1,2,3,4,5,6].map(n => <option key={n}>{n}</option>)}
+                    {[0,1,2,3,4,5,6].map(n => <option key={n}>{n}</option>)}
                   </select>
                   {errors.cabines && <p className="text-xs text-danger-600 mt-1">{errors.cabines}</p>}
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Lits</p>
+                  <select className={inp('lits')} value={form.lits} onChange={e => set('lits', e.target.value)}>
+                    <option value="">—</option>
+                    {[0,1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n}>{n}</option>)}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1">Sert à adapter les draps du check-in</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Capacité max <span className="text-danger-600">*</span></p>

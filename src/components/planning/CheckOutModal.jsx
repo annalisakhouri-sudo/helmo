@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { X, Check, ChevronDown, ChevronUp, AlertTriangle, Euro, Minus, Plus, CircleCheck } from 'lucide-react'
 import { getMaintenanceTasks, setArrivalQuantity, updateAnomalyDetail, subscribe } from '@/lib/shared-state'
-import { CHECKLIST, ALL_ITEMS } from './MaintenanceModal'
+import { buildChecklist } from './MaintenanceModal'
+import { BOATS } from '@/lib/mock-data'
 
 // Fiche CHECK-OUT côté app technicien : ici, tout le détail — comptage, écarts détectés
 // automatiquement par rapport à la référence du check-in de départ, note libre et prix
@@ -59,6 +60,9 @@ function AnomalyCard({ item, gap, detail, bookingId }) {
 }
 
 export default function CheckOutModal({ booking, onClose }) {
+  const boat = BOATS.find(b => b.id === booking.boatId)
+  const CHECKLIST = buildChecklist(boat, booking)
+  const ALL_ITEMS = CHECKLIST.flatMap(c => c.items)
   const [, forceUpdate] = useState(0)
   const [collapsed, setCollapsed] = useState({})
   useEffect(() => subscribe(() => forceUpdate(v => v + 1)), [])

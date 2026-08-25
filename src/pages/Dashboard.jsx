@@ -45,6 +45,7 @@ function initials(name) {
 function MovementRow({ booking, date, type, onSelect }) {
   const accent = type === 'depart' ? '#1B4F8A' : '#0F7D57'
   const bg = type === 'depart' ? '#EEF2F7' : '#E2F5EF'
+  const isToday = date === format(TODAY, 'yyyy-MM-dd')
   return (
     <div
       className="flex items-center gap-3 pl-2 pr-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors border-l-2"
@@ -61,6 +62,7 @@ function MovementRow({ booking, date, type, onSelect }) {
         <p className="text-xs font-semibold truncate">{booking.client}</p>
         <p className="text-[11px] text-gray-400 truncate">{booking.boatName}</p>
       </div>
+      {isToday && <span className="text-[9px] font-bold uppercase text-white px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: accent }}>Aujourd'hui</span>}
       <p className="text-[11px] font-medium capitalize flex-shrink-0" style={{ color: accent }}>
         {format(parseISO(date), 'EEE d MMM', { locale: fr })}
       </p>
@@ -69,7 +71,7 @@ function MovementRow({ booking, date, type, onSelect }) {
 }
 
 // ── Liste compacte des mouvements (départs/retours) d'une semaine, séparés ──
-function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect, muted }) {
+function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect }) {
   const departs = bookings
     .filter(b => { try { return isWithinInterval(parseISO(b.start), { start: weekStart, end: weekEnd }) } catch { return false } })
     .sort((a, b) => a.start.localeCompare(b.start))
@@ -78,7 +80,7 @@ function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect
     .sort((a, b) => a.end.localeCompare(b.end))
 
   return (
-    <div className={`card p-0 overflow-hidden ${muted ? 'opacity-90' : ''}`}>
+    <div className="card p-0 overflow-hidden">
       <div className="px-5 pt-4 pb-3 border-b border-gray-50">
         <p className="text-sm font-semibold font-display">{title}</p>
         <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>
@@ -250,26 +252,16 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Pilotage à 2 semaines : mouvements de la semaine en cours et de la suivante */}
-        <div className="grid grid-cols-2 gap-4">
-          <WeekMovements
-            title="Cette semaine"
-            subtitle={weekRangeLabel(currentWeekStart, currentWeekEnd)}
-            weekStart={currentWeekStart}
-            weekEnd={currentWeekEnd}
-            bookings={bookings}
-            onSelect={(b, type) => { setSelectedBooking(b); setSelectedContext(type) }}
-          />
-          <WeekMovements
-            title="Semaine prochaine"
-            subtitle={weekRangeLabel(nextWeekStart, nextWeekEnd)}
-            weekStart={nextWeekStart}
-            weekEnd={nextWeekEnd}
-            bookings={bookings}
-            onSelect={(b, type) => { setSelectedBooking(b); setSelectedContext(type) }}
-            muted
-          />
-        </div>
+        {/* Anticiper : ce qui arrive la semaine prochaine (cette semaine est déjà couverte
+            par les 3 compteurs cliquables plus haut — pas besoin de la répéter ici) */}
+        <WeekMovements
+          title="Semaine prochaine"
+          subtitle={weekRangeLabel(nextWeekStart, nextWeekEnd)}
+          weekStart={nextWeekStart}
+          weekEnd={nextWeekEnd}
+          bookings={bookings}
+          onSelect={(b, type) => { setSelectedBooking(b); setSelectedContext(type) }}
+        />
 
       </div>
 

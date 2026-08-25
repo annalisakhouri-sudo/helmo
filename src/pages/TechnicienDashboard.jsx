@@ -1,36 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Check, AlertTriangle, ChevronRight, ChevronLeft, X, Anchor, Users, LogOut, Phone, FileText, ClipboardCheck, CircleCheck, PenLine, Calendar } from 'lucide-react'
+import { Check, AlertTriangle, ChevronRight, ChevronLeft, X, Anchor, Users, LogOut, Phone, FileText, ClipboardCheck, CircleCheck, PenLine, Calendar, AlertOctagon } from 'lucide-react'
 import { BOATS, CLIENTS, SKIPPERS, BOOKINGS, DOC_LABELS, TECHNICIANS, OPTIONS_CATALOG } from '@/lib/mock-data'
 import { TechSidebar } from '@/components/layout/SkipperLayout'
-import { getState, toggleTask, subscribe, completeCheckIn, getCheckInProgress, toggleCheckInItem, setCheckInItemsBulk, setCheckInMissing, setCheckInRemarks, setMissionNote } from '@/lib/shared-state'
+import { getState, toggleTask, subscribe, completeCheckIn, getCheckInProgress, toggleCheckInItem, setCheckInItemsBulk, setCheckInMissing, setCheckInRemarks, setMissionNote, addMissionRequest } from '@/lib/shared-state'
+import { getMissionsForTech } from '@/lib/tech-missions'
 import CheckOutModal from '@/components/planning/CheckOutModal'
 import { addDays, format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWithinInterval, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
-// ── Données missions par technicien ──────────────────────────────
-const TECH_MISSIONS = {
-  'tech-1': [
-    { id:'m1', type:'depart', date:'2026-07-05', heure:'08:30', boatId:'mn-1', boatName:'Dufour 360 GL — Yume', clientId:'cli-1', client:'Moreau Jean', bookingId:'bk-1', skipperId:'skip-1' },
-    { id:'m2', type:'retour', date:'2026-07-12', heure:'09:00', boatId:'mn-1', boatName:'Dufour 360 GL — Yume', clientId:'cli-1', client:'Moreau Jean', bookingId:'bk-1', skipperId:'skip-1' },
-    { id:'m3', type:'depart', date:'2026-07-12', heure:'10:30', boatId:'mn-3', boatName:'Dufour 390 — Juleroga', clientId:'cli-3', client:'Martin Pierre', bookingId:'bk-3', skipperId:null },
-    { id:'m4', type:'depart', date:'2026-07-19', heure:'08:30', boatId:'mn-2', boatName:'Dufour 382 GL — Kalliste', clientId:'cli-1', client:'Moreau Jean', bookingId:'bk-6', skipperId:null },
-  ],
-  'tech-2': [
-    { id:'m5', type:'depart', date:'2026-07-05', heure:'09:00', boatId:'lm-1', boatName:'Tempest 505', clientId:'cli-4', client:'Legrand François', bookingId:'bk-4', skipperId:null },
-    { id:'m6', type:'retour', date:'2026-07-12', heure:'10:00', boatId:'lm-1', boatName:'Tempest 505', clientId:'cli-4', client:'Legrand François', bookingId:'bk-4', skipperId:null },
-  ],
-  'tech-3': [
-    { id:'m7', type:'depart', date:'2026-07-05', heure:'08:00', boatId:'mn-5', boatName:'Astrea 42 — Bôrev', clientId:'cli-2', client:'Bernard Laurent', bookingId:'bk-2', skipperId:'skip-2' },
-    { id:'m8', type:'depart', date:'2026-07-12', heure:'08:00', boatId:'mn-6', boatName:'460 — L\'After', clientId:'cli-5', client:'Faure Christine', bookingId:'bk-5', skipperId:'skip-3' },
-    { id:'m9', type:'retour', date:'2026-07-12', heure:'10:00', boatId:'mn-5', boatName:'Astrea 42 — Bôrev', clientId:'cli-2', client:'Bernard Laurent', bookingId:'bk-2', skipperId:'skip-2' },
-  ],
-}
+// ── Techniciens et leurs missions : même source que la page agence (src/lib/tech-missions.js) ──
+// Une réassignation faite côté agence apparaît immédiatement ici, et inversement.
+const TECH_META = TECHNICIANS.map(t => ({ id: t.id, name: t.name, initials: t.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), color: '#185FA5', base: t.base }))
 
-const TECH_META = [
-  { id:'tech-1', name:'Karim B.', initials:'KB', color:'#185FA5', base:'Vieux-Port' },
-  { id:'tech-2', name:'Léa M.', initials:'LM', color:'#0F6E56', base:'Vieux-Port' },
-  { id:'tech-3', name:'Marc D.', initials:'MD', color:'#854F0B', base:'Port Corbières' },
-]
+function getTechMissions(techId) {
+  return getMissionsForTech(techId).map(m => ({ ...m, boatName: m.boat }))
+}
 
 const CHECKLIST_ITEMS = [
   { category:'🔴 Sécurité', items:[{id:'c1',label:'Gilets de sauvetage (x6)'},{id:'c2',label:'Fusées de détresse'},{id:'c3',label:'Extincteur'},{id:'c4',label:'Balise EPIRB'},{id:'c5',label:'Trousse premiers secours'}]},
@@ -479,6 +463,8 @@ function TechMission({ tech, mission, tasks, onBack, onToggle, sharedState }) {
   const [showCheckOut, setShowCheckOut] = useState(false)
   const [showBoat, setShowBoat] = useState(false)
   const [showClient, setShowClient] = useState(false)
+  const [showRequest, setShowRequest] = useState(false)
+  const [requestMsg, setRequestMsg] = useState('')
   const checkInDone = sharedState.checkIns[mission.bookingId]?.done
   const done = tasks.filter(t=>t.done).length
   const pct = tasks.length ? Math.round((done/tasks.length)*100) : 0
@@ -557,12 +543,45 @@ function TechMission({ tech, mission, tasks, onBack, onToggle, sharedState }) {
 
         <p className="section-label">Notes</p>
         <textarea
-          className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-navy-600 mb-4"
+          className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-navy-600 mb-3"
           rows={3}
           placeholder="Une remarque sur cette mission (accès, état particulier, consigne...)"
           value={sharedState.missionNotes[mission.bookingId] || ''}
           onChange={e => setMissionNote(mission.bookingId, e.target.value)}
         />
+
+        <button
+          className="btn-ghost w-full justify-center py-2 mb-4 text-danger-700 border border-danger-100 bg-danger-50 hover:bg-danger-100"
+          onClick={() => setShowRequest(true)}
+        >
+          <AlertOctagon size={14} /> Signaler un empêchement
+        </button>
+
+        {showRequest && (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[70] p-6" onClick={() => setShowRequest(false)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+              <p className="text-sm font-semibold mb-1">Signaler un empêchement</p>
+              <p className="text-xs text-gray-400 mb-3">L'agence sera prévenue et pourra réassigner cette mission à quelqu'un d'autre.</p>
+              <textarea
+                className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-navy-600 mb-3"
+                rows={3}
+                placeholder="Ex : je suis malade, je ne pourrai pas être là samedi matin..."
+                value={requestMsg}
+                onChange={e => setRequestMsg(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <button className="btn-ghost flex-1 justify-center" onClick={() => setShowRequest(false)}>Annuler</button>
+                <button
+                  className="btn-primary flex-1 justify-center"
+                  disabled={!requestMsg.trim()}
+                  onClick={() => { addMissionRequest(mission.key, tech.id, tech.name, requestMsg); setRequestMsg(''); setShowRequest(false) }}
+                >
+                  Envoyer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isDepart ? (
           !checkInDone
@@ -593,7 +612,7 @@ export default function TechnicienDashboard({ onLogout }) {
   useEffect(() => subscribe(s=>setSharedState(s)), [])
 
   const tech = TECH_META.find(t=>t.id===selectedTech)
-  const missions = selectedTech ? (TECH_MISSIONS[selectedTech]||[]) : []
+  const missions = selectedTech ? getTechMissions(selectedTech) : []
 
   function handleToggle(techId, missionId, taskId) {
     toggleTask(techId, missionId, taskId)
@@ -683,7 +702,7 @@ export default function TechnicienDashboard({ onLogout }) {
         <div className="flex-1 overflow-auto p-5">
           <div className="flex flex-col gap-3">
             {TECH_META.map(t=>{
-              const tMissions=TECH_MISSIONS[t.id]||[]
+              const tMissions=getTechMissions(t.id)
               const totalDone=tMissions.reduce((acc,m)=>acc+(sharedState.techTasks[t.id]?.[m.id]||[]).filter(tk=>tk.done).length,0)
               const totalTasks=tMissions.reduce((acc,m)=>acc+(sharedState.techTasks[t.id]?.[m.id]||[]).length,0)
               const hasAlert=tMissions.some(m=>(sharedState.techTasks[t.id]?.[m.id]||[]).some(tk=>tk.alert&&!tk.done))

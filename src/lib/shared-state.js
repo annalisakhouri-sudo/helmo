@@ -3,23 +3,15 @@
 
 let listeners = []
 let state = {
-  techTasks: {
-    'tech-1': {
-      'm1': [{id:'t1',label:'Nettoyage cabines',done:true},{id:'t2',label:'Draps posés (3 jeux)',done:true},{id:'t3',label:'Inventaire vérifié',done:true},{id:'t4',label:'Équipements sécurité',done:false},{id:'t5',label:'Carburant vérifié',done:false}],
-      'm2': [{id:'t6',label:'Vérification état général',done:false},{id:'t7',label:'Inventaire retour',done:false},{id:'t8',label:'Nettoyage complet',done:false},{id:'t9',label:'Photos état du bateau',done:false}],
-      'm3': [{id:'t10',label:'Nettoyage cockpit',done:false},{id:'t11',label:'Inventaire complet',done:false},{id:'t12',label:'Équipements sécurité',done:false}],
-      'm4': [{id:'t13',label:'Nettoyage cabines',done:false},{id:'t14',label:'Inventaire vérifié',done:false},{id:'t15',label:'Équipements sécurité',done:false}],
-    },
-    'tech-2': {
-      'm5': [{id:'t16',label:'Nettoyage cockpit',done:true},{id:'t17',label:'Carburant plein',done:false,alert:true},{id:'t18',label:'Inventaire vérifié',done:false},{id:'t19',label:'Équipements sécurité',done:false}],
-      'm6': [{id:'t20',label:'État général vérifié',done:false},{id:'t21',label:'Inventaire retour',done:false},{id:'t22',label:'Nettoyage',done:false}],
-    },
-    'tech-3': {
-      'm7': [{id:'t23',label:'Nettoyage cabines (4)',done:false},{id:'t24',label:'Draps posés (4 jeux)',done:false},{id:'t25',label:'Inventaire cuisine',done:false},{id:'t26',label:'Équipements sécurité',done:false},{id:'t27',label:'Vérification moteurs',done:false}],
-      'm8': [{id:'t28',label:'Nettoyage cabines (5)',done:false},{id:'t29',label:'Draps posés (5 jeux)',done:false},{id:'t30',label:'Inventaire complet',done:false},{id:'t31',label:'Équipements sécurité',done:false}],
-      'm9': [{id:'t32',label:'État général vérifié',done:false},{id:'t33',label:'Inventaire retour',done:false},{id:'t34',label:'Nettoyage complet',done:false},{id:'t35',label:'Rapport état des lieux',done:false}],
-    },
-  },
+  // techTasks : bookingId -> missionKey ('dep-<id>' | 'ret-<id>') -> [{id,label,done}]
+  // Rempli à la demande (getTechTasks) avec des modèles par défaut, pas figé à l'avance.
+  techTasks: {},
+  // missionAssignments : missionKey -> techId. Par défaut, un technicien est responsable
+  // du bateau (voir mock-data TECHNICIANS.assignedBoats) ; l'agence peut réassigner
+  // une mission précise à un autre technicien, ce qui prime sur ce défaut.
+  missionAssignments: {},
+  // missionRequests : demandes d'un technicien (empêchement, échange...) à traiter par l'agence.
+  missionRequests: [],
   // Notes libres du technicien sur une mission (départ ou retour), accessibles depuis
   // la fiche mission. bookingId -> texte.
   missionNotes: {},
@@ -166,19 +158,43 @@ export function setMissionNote(bookingId, text) {
 
 export function getState() { return state }
 
-export function toggleTask(techId, missionId, taskId) {
+export function getTechTasks(techId, missionKey, defaultTasks) {
+  if (!state.techTasks[techId]) state.techTasks[techId] = {}
+  if (!state.techTasks[techId][missionKey]) state.techTasks[techId][missionKey] = defaultTasks
+  return state.techTasks[techId][missionKey]
+}
+
+export function toggleTask(techId, missionKey, taskId) {
+  const current = state.techTasks[techId]?.[missionKey] || []
   state = {
     ...state,
     techTasks: {
       ...state.techTasks,
       [techId]: {
         ...state.techTasks[techId],
-        [missionId]: state.techTasks[techId][missionId].map(t =>
-          t.id === taskId ? { ...t, done: !t.done } : t
-        )
-      }
-    }
+        [missionKey]: current.map(t => t.id === taskId ? { ...t, done: !t.done } : t),
+      },
+    },
   }
+  listeners.forEach(fn => fn(state))
+}
+
+// L'agence réassigne une mission précise à un autre technicien que le responsable par défaut.
+export function assignMission(missionKey, techId) {
+  state = { ...state, missionAssignments: { ...state.missionAssignments, [missionKey]: techId } }
+  listeners.forEach(fn => fn(state))
+}
+
+// Un technicien signale un empêchement (ou autre demande) sur une mission ; l'agence
+// la voit et peut réassigner en conséquence.
+export function addMissionRequest(missionKey, techId, techName, message) {
+  const request = { id: 'req-' + Date.now(), missionKey, techId, techName, message, status: 'open' }
+  state = { ...state, missionRequests: [...state.missionRequests, request] }
+  listeners.forEach(fn => fn(state))
+}
+
+export function resolveMissionRequest(requestId) {
+  state = { ...state, missionRequests: state.missionRequests.map(r => r.id === requestId ? { ...r, status: 'resolved' } : r) }
   listeners.forEach(fn => fn(state))
 }
 

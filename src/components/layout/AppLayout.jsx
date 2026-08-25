@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, Calendar, FileText, Users, Star, Wrench,
+  LayoutDashboard, Calendar, Users, Wrench,
   Anchor, UserCircle, MessageCircle, LogOut, Tag
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -9,27 +9,31 @@ import { BRANDS } from '@/lib/mock-data'
 
 const NAV = [
   {
-    section: 'Gestion',
+    section: 'Pilotage',
     items: [
       { to: '/', label: 'Vue d\'ensemble', icon: LayoutDashboard },
       { to: '/planning', label: 'Planning', icon: Calendar },
+    ],
+  },
+  {
+    section: 'Locations',
+    items: [
       { to: '/clients', label: 'Clients', icon: UserCircle },
-    ],
-  },
-  {
-    section: 'Skippers',
-    items: [
-      { to: '/skippers', label: 'Trouver un skipper', icon: Users },
-      { to: '/mes-skippers', label: 'Mes skippers', icon: Star },
-      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle },
-    ],
-  },
-  {
-    section: 'Opérations',
-    items: [
-      { to: '/techniciens', label: 'Techniciens', icon: Wrench },
-      { to: '/bateaux', label: 'Mes bateaux', icon: Anchor },
       { to: '/options', label: 'Options & tarifs', icon: Tag },
+    ],
+  },
+  {
+    section: 'Flotte',
+    items: [
+      { to: '/bateaux', label: 'Mes bateaux', icon: Anchor },
+    ],
+  },
+  {
+    section: 'Équipe',
+    items: [
+      { to: '/skippers', label: 'Skippers', icon: Users },
+      { to: '/techniciens', label: 'Techniciens', icon: Wrench },
+      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle },
     ],
   },
 ]

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Messagerie from './Messagerie'
 import ReservationModal from '@/components/skippers/ReservationModal'
 import { Search, Star, MessageCircle, CalendarPlus, X, Check, Shield } from 'lucide-react'
-import { SKIPPERS } from '@/lib/mock-data'
+import { SKIPPERS, BOOKINGS } from '@/lib/mock-data'
 import { Card, SectionLabel, Avatar } from '@/components/ui'
 
 const PERMIS_ICONS = { 'Côtier': '🪪', 'Hauturier': '🌊', 'CRR': '📻', 'STCW': '⛑️', 'Yachtmaster': '🏅' }
@@ -123,8 +123,15 @@ function SkipperDetail({ skipper, onClose }) {
 export default function Skippers() {
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState({ permis: '', boat: '' })
+  const [tab, setTab] = useState('tous') // 'tous' | 'connus'
 
-  const filtered = SKIPPERS.filter(s => {
+  const withHistory = SKIPPERS.map(s => {
+    const pastBookings = BOOKINGS.filter(b => b.skipperId === s.id).sort((a, b) => b.end.localeCompare(a.end))
+    return { ...s, agencyMissions: pastBookings.length, lastMissionDate: pastBookings[0]?.end || null }
+  })
+
+  const filtered = withHistory.filter(s => {
+    if (tab === 'connus' && s.agencyMissions === 0) return false
     if (filter.permis && !s.permis.includes(filter.permis)) return false
     if (filter.boat && !s.boats.includes(filter.boat)) return false
     return true
@@ -134,8 +141,8 @@ export default function Skippers() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="topbar">
         <div>
-          <h1 className="font-display text-base font-bold">Trouver un skipper</h1>
-          <p className="text-xs text-gray-400">{filtered.length} skippers disponibles · Marseille</p>
+          <h1 className="font-display text-base font-bold">Skippers</h1>
+          <p className="text-xs text-gray-400">{filtered.length} skipper{filtered.length > 1 ? 's' : ''} · Marseille</p>
         </div>
         <div className="flex gap-2">
           <select className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600" onChange={e => setFilter(f => ({ ...f, permis: e.target.value }))}>
@@ -153,7 +160,27 @@ export default function Skippers() {
         </div>
       </div>
 
+      <div className="px-5 pt-4 flex gap-1.5">
+        <button
+          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${tab === 'tous' ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+          onClick={() => setTab('tous')}
+        >
+          Tous les skippers
+        </button>
+        <button
+          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${tab === 'connus' ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+          onClick={() => setTab('connus')}
+        >
+          Déjà travaillé avec vous
+        </button>
+      </div>
+
       <div className="flex-1 overflow-auto p-5">
+        {filtered.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-sm text-gray-400">Aucun skipper à afficher ici pour l'instant.</p>
+          </div>
+        ) : (
         <Card className="divide-y divide-gray-50">
           {filtered.map(s => (
             <div key={s.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-gray-50 -mx-4 px-4 transition-colors" onClick={() => setSelected(s)}>
@@ -163,7 +190,11 @@ export default function Skippers() {
                   <p className="text-sm font-medium">{s.name}</p>
                   <Shield size={11} className="text-teal-600 flex-shrink-0" title="Vérifié Helmo" />
                 </div>
-                <p className="text-xs text-gray-400">{s.location} · {s.missions} missions</p>
+                {s.agencyMissions > 0 ? (
+                  <p className="text-xs text-gray-400">{s.agencyMissions} mission{s.agencyMissions > 1 ? 's' : ''} avec vous · Dernière : {s.lastMissionDate}</p>
+                ) : (
+                  <p className="text-xs text-gray-400">{s.location} · {s.missions} missions au total</p>
+                )}
                 <div className="flex gap-1 mt-1 flex-wrap">
                   {s.permis.map(p => <span key={p} className="pill-blue text-[9px]">{p}</span>)}
                   {s.boats.map(b => <span key={b} className="bg-gray-100 text-gray-500 text-[9px] px-1.5 py-0.5 rounded-full">{b}</span>)}
@@ -178,6 +209,7 @@ export default function Skippers() {
             </div>
           ))}
         </Card>
+        )}
       </div>
 
       {selected && <SkipperDetail skipper={selected} onClose={() => setSelected(null)} />}

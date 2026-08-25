@@ -10,8 +10,6 @@ const DOC_ICONS = {
   jauge: FileText,
 }
 
-const EQUIPEMENTS = ['SUP x2', 'Annexe', 'Taud de soleil', 'Masque & tuba x3', 'Gilets de sauvetage', 'VHF à bord']
-
 export default function FichePublique() {
   const { id } = useParams()
   const boat = BOATS.find(b => b.id === id)
@@ -51,7 +49,7 @@ export default function FichePublique() {
             <Anchor size={24} className="text-navy-600" style={{ color: '#185FA5' }} />
           </div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{boat.name}</h1>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>{boat.type} · {boat.length}m · {boat.port}</p>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>{boat.type} · {boat.length}m · {boat.capacite} pers. · {boat.port}</p>
 
           {/* Statut global */}
           {allDocsOk ? (
@@ -101,16 +99,6 @@ export default function FichePublique() {
                 </div>
               )
             })}
-          </div>
-        </div>
-
-        {/* Équipements */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4 shadow-sm">
-          <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginBottom: 12 }}>Équipements à bord</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {EQUIPEMENTS.map(eq => (
-              <span key={eq} style={{ background: '#EFF6FF', color: '#1e40af', fontSize: 12, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #BFDBFE' }}>{eq}</span>
-            ))}
           </div>
         </div>
 

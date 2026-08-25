@@ -5,7 +5,7 @@ import { TECHNICIANS, BOATS } from '@/lib/mock-data'
 import { Card, SectionLabel, ProgressBar } from '@/components/ui'
 import CheckIn from './CheckIn'
 import { getState, subscribe, completeCheckIn, getMaintenanceTasks } from '@/lib/shared-state'
-import { ALL_ITEMS } from './MaintenanceModal'
+import { buildChecklist } from './MaintenanceModal'
 
 const DOC_ICONS = { francisation: FileText, assurance: Shield, securite: Anchor, jauge: Anchor }
 const DOC_NAMES = { francisation: 'Francisation', assurance: 'Assurance', securite: 'Carnet sécurité', jauge: 'Jauge' }
@@ -131,11 +131,30 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                 )}
               </div>
 
-              {/* État des lieux : check-in au départ, check-out (lecture seule) au retour */}
+              {/* Check-in (toujours visible, quel que soit le contexte) */}
               <div>
-                <SectionLabel>État des lieux</SectionLabel>
-                {context === 'retour' ? (
-                  (() => {
+                <SectionLabel>Check-in {context === 'retour' && '(départ)'}</SectionLabel>
+                {checkInDone ? (
+                  <div className="flex items-center gap-2.5 bg-teal-50 border border-teal-100 rounded-xl p-3">
+                    <CircleCheck size={18} className="text-teal-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-teal-800">Check-in complété</p>
+                      <p className="text-xs text-teal-600">Signé par {booking.client} · PDF enregistré</p>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="btn-primary w-full justify-center py-2.5" onClick={() => setShowCheckIn(true)}>
+                    <ClipboardCheck size={15} /> Démarrer le check-in
+                  </button>
+                )}
+              </div>
+
+              {/* Check-out (lecture seule, uniquement pertinent en contexte retour) */}
+              {context === 'retour' && (
+                <div>
+                  <SectionLabel>Check-out (retour)</SectionLabel>
+                  {(() => {
+                    const ALL_ITEMS = buildChecklist(boat, booking).flatMap(c => c.items)
                     const stored = getMaintenanceTasks(booking.id, ALL_ITEMS.map(i => ({ id: i.id, qty: i.max, max: i.max })), [])
                     const anomalyDetails = stored.anomalyDetails || {}
                     const missingItems = ALL_ITEMS.filter(i => {
@@ -167,21 +186,9 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                         </div>
                       </div>
                     )
-                  })()
-                ) : checkInDone ? (
-                  <div className="flex items-center gap-2.5 bg-teal-50 border border-teal-100 rounded-xl p-3">
-                    <CircleCheck size={18} className="text-teal-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-teal-800">Check-in complété</p>
-                      <p className="text-xs text-teal-600">Signé par {booking.client} · PDF enregistré</p>
-                    </div>
-                  </div>
-                ) : (
-                  <button className="btn-primary w-full justify-center py-2.5" onClick={() => setShowCheckIn(true)}>
-                    <ClipboardCheck size={15} /> Démarrer le check-in
-                  </button>
-                )}
-              </div>
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Colonne droite */}

@@ -13,7 +13,6 @@ import FichePublique from '@/pages/FichePublique'
 import Login from '@/pages/Login'
 import SkipperDashboard from '@/pages/SkipperDashboard'
 import TechnicienDashboard from '@/pages/TechnicienDashboard'
-import { MesSkippers } from '@/pages/Others'
 
 function AppWithAuth() {
   const [user, setUser] = useState(() => {
@@ -58,7 +57,6 @@ function AppWithAuth() {
         { path: 'planning', element: <Planning /> },
         { path: 'clients', element: <Clients /> },
         { path: 'skippers', element: <Skippers /> },
-        { path: 'mes-skippers', element: <MesSkippers /> },
         { path: 'techniciens', element: <Techniciens /> },
         { path: 'bateaux', element: <Bateaux /> },
         { path: 'options', element: <Options /> },

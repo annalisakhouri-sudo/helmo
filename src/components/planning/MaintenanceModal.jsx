@@ -1,34 +1,70 @@
 import { useState, useEffect } from 'react'
 import { X, ArrowUpRight, ArrowDownLeft, AlertTriangle, Euro } from 'lucide-react'
 import { getMaintenanceTasks, subscribe } from '@/lib/shared-state'
+import { OPTIONS_CATALOG } from '@/lib/mock-data'
 
 // Cette fiche est celle de l'EXTRANET AGENCE : lecture seule, juste une vision globale
 // de l'avancement du technicien. Le détail éditable (checklist, notes, prix des écarts)
 // se remplit côté app technicien, pas ici.
-export const CHECKLIST = [
-  { category: '🔴 Sécurité', items: [
-    { id: 's1', label: 'Gilets de sauvetage', max: 8 },
-    { id: 's2', label: 'Fusées de détresse', max: 6 },
-    { id: 's3', label: 'Extincteur', max: 2 },
-    { id: 's4', label: 'Trousse premiers secours', max: 1 },
-  ]},
-  { category: '🍽 Cuisine', items: [
-    { id: 'c1', label: 'Assiettes', max: 8 },
-    { id: 'c2', label: 'Verres', max: 8 },
-    { id: 'c3', label: 'Fourchettes', max: 8 },
-    { id: 'c4', label: 'Couteaux', max: 8 },
-  ]},
-  { category: '🛏 Cabines', items: [
-    { id: 'b1', label: 'Oreillers', max: 8 },
-    { id: 'b2', label: 'Couvertures', max: 6 },
-  ]},
-  { category: '⚓ Nautique', items: [
+//
+// La checklist s'adapte au bateau (capacité, lits, type) et aux options/draps réellement
+// pris sur cette location — un semi-rigide n'a pas de cabines à vérifier, un catamaran
+// 12 personnes n'a pas la même vaisselle qu'un voilier 8 personnes.
+export function buildChecklist(boat, booking) {
+  const capacite = boat?.capacite || 8
+  const cabines = boat?.cabines ?? 3
+  const lits = boat?.lits ?? (cabines * 2)
+  const isDayBoat = cabines === 0
+
+  const sections = [
+    { category: '🔴 Sécurité', items: isDayBoat ? [
+      { id: 's1', label: 'Gilets de sauvetage', max: capacite },
+      { id: 's3', label: 'Extincteur', max: 1 },
+      { id: 's4', label: 'Trousse premiers secours', max: 1 },
+    ] : [
+      { id: 's1', label: 'Gilets de sauvetage', max: capacite },
+      { id: 's2', label: 'Fusées de détresse', max: 6 },
+      { id: 's3', label: 'Extincteur', max: 2 },
+      { id: 's4', label: 'Trousse premiers secours', max: 1 },
+    ]},
+  ]
+
+  if (!isDayBoat) {
+    sections.push({ category: '🍽 Cuisine', items: [
+      { id: 'c1', label: 'Assiettes', max: capacite },
+      { id: 'c2', label: 'Verres', max: capacite },
+      { id: 'c3', label: 'Fourchettes', max: capacite },
+      { id: 'c4', label: 'Couteaux', max: capacite },
+    ]})
+    sections.push({ category: '🛏 Cabines', items: [
+      { id: 'b1', label: 'Oreillers', max: lits },
+      { id: 'b2', label: 'Couvertures', max: lits },
+    ]})
+  }
+
+  sections.push({ category: '⚓ Nautique', items: isDayBoat ? [
+    { id: 'n1', label: 'Jerricane carburant', max: 1 },
+    { id: 'n2', label: 'Fenders', max: 4 },
+  ] : [
     { id: 'n1', label: 'Jerricane carburant', max: 2 },
     { id: 'n2', label: 'Fenders', max: 6 },
-    { id: 'n3', label: 'Pagaies SUP', max: 2 },
-  ]},
-]
-export const ALL_ITEMS = CHECKLIST.flatMap(c => c.items)
+  ]})
+
+  const dynamicItems = []
+  ;(booking?.draps || []).forEach((d, i) => dynamicItems.push({ id: `drap-${i}`, label: `Draps — ${d.name} × ${d.qty} ${d.unit}`, max: d.qty }))
+  Object.entries(booking?.options || {}).forEach(([optId, val]) => {
+    if (!val) return
+    const opt = OPTIONS_CATALOG.find(o => o.id === optId)
+    if (!opt) return
+    const qty = typeof val === 'object' ? val.qty : 1
+    dynamicItems.push({ id: `opt-${optId}`, label: qty > 1 ? `${opt.label} × ${qty}` : opt.label, max: qty })
+  })
+  if (dynamicItems.length > 0) {
+    sections.push({ category: '🎒 Draps & options de cette location', items: dynamicItems })
+  }
+
+  return sections
+}
 
 function ProgressCard({ icon: Icon, iconBg, title, subtitle, pct, complete }) {
   return (
@@ -57,8 +93,11 @@ export default function MaintenanceModal({ booking, nextBooking, boat, onClose }
   const [, forceUpdate] = useState(0)
   useEffect(() => subscribe(() => forceUpdate(v => v + 1)), [])
 
+  const ARRIVAL_ITEMS = buildChecklist(boat, booking).flatMap(c => c.items)
+  const DEPARTURE_ITEMS = nextBooking ? buildChecklist(boat, nextBooking).flatMap(c => c.items) : []
+
   // Check-out d'ARRIVÉE (retour du client actuel), comparé à son check-in de départ d'origine.
-  const arrivalStored = getMaintenanceTasks(booking.id, ALL_ITEMS.map(i => ({ id: i.id, qty: i.max, max: i.max })), [])
+  const arrivalStored = getMaintenanceTasks(booking.id, ARRIVAL_ITEMS.map(i => ({ id: i.id, qty: i.max, max: i.max })), [])
   const departureQuantities = {}
   arrivalStored.arrival.forEach(t => { departureQuantities[t.id] = t.max })
   const arrivalQuantities = {}
@@ -66,23 +105,23 @@ export default function MaintenanceModal({ booking, nextBooking, boat, onClose }
   const anomalyDetails = arrivalStored.anomalyDetails || {}
 
   // Check-in de DÉPART pour le prochain client — vision globale seulement, pas de détail.
-  const departureStored = nextBooking ? getMaintenanceTasks(nextBooking.id, ALL_ITEMS.map(i => ({ id: i.id, qty: 0, max: i.max })), []) : null
+  const departureStored = nextBooking ? getMaintenanceTasks(nextBooking.id, DEPARTURE_ITEMS.map(i => ({ id: i.id, qty: 0, max: i.max })), []) : null
   const newCheckinQuantities = {}
   if (departureStored) departureStored.arrival.forEach(t => { newCheckinQuantities[t.id] = t.qty })
 
   // Écarts non écartés par le technicien (une anomalie "dismissed" = fausse alerte, on ne l'affiche plus)
-  const missingItems = ALL_ITEMS.filter(i => {
+  const missingItems = ARRIVAL_ITEMS.filter(i => {
     const gap = (departureQuantities[i.id] ?? i.max) - (arrivalQuantities[i.id] ?? i.max)
     return gap > 0 && !anomalyDetails[i.id]?.dismissed
   })
 
-  const arrivalCompleteCount = ALL_ITEMS.filter(i => arrivalQuantities[i.id] === departureQuantities[i.id] || anomalyDetails[i.id]?.dismissed).length
-  const arrivalPct = Math.round((arrivalCompleteCount / ALL_ITEMS.length) * 100)
+  const arrivalCompleteCount = ARRIVAL_ITEMS.filter(i => arrivalQuantities[i.id] === departureQuantities[i.id] || anomalyDetails[i.id]?.dismissed).length
+  const arrivalPct = Math.round((arrivalCompleteCount / ARRIVAL_ITEMS.length) * 100)
   const arrivalComplete = missingItems.length === 0
 
-  const departureDone = nextBooking ? ALL_ITEMS.filter(i => newCheckinQuantities[i.id] === i.max).length : 0
-  const departurePct = nextBooking ? Math.round((departureDone / ALL_ITEMS.length) * 100) : 0
-  const departureComplete = nextBooking ? departureDone === ALL_ITEMS.length : false
+  const departureDone = nextBooking ? DEPARTURE_ITEMS.filter(i => newCheckinQuantities[i.id] === i.max).length : 0
+  const departurePct = nextBooking ? Math.round((departureDone / DEPARTURE_ITEMS.length) * 100) : 0
+  const departureComplete = nextBooking ? departureDone === DEPARTURE_ITEMS.length : false
 
   const totalCost = missingItems.reduce((sum, i) => sum + (Number(anomalyDetails[i.id]?.price) || 0), 0)
 
@@ -149,7 +188,7 @@ export default function MaintenanceModal({ booking, nextBooking, boat, onClose }
               icon={ArrowDownLeft}
               iconBg="#1B4F8A"
               title={`Départ — ${nextBooking.client}`}
-              subtitle={`Check-in à remplir · ${departureDone}/${ALL_ITEMS.length}`}
+              subtitle={`Check-in à remplir · ${departureDone}/${DEPARTURE_ITEMS.length}`}
               pct={departurePct}
               complete={departureComplete}
             />

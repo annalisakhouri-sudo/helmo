@@ -1,64 +1,103 @@
 import { useState } from 'react'
 import { Check, ChevronDown, ChevronUp, X, PenLine, CircleCheck, AlertTriangle, FileText } from 'lucide-react'
 import { completeCheckIn } from '@/lib/shared-state'
+import { BOATS, OPTIONS_CATALOG } from '@/lib/mock-data'
 
-const CHECKLIST = [
-  {
-    category: '🔴 Sécurité obligatoire',
-    items: [
-      { id: 's1', label: 'Gilets de sauvetage', max: 12 },
-      { id: 's2', label: 'Fusées de détresse', max: 6 },
-      { id: 's3', label: 'Extincteur', max: 2 },
-      { id: 's4', label: 'Balise EPIRB', max: 1 },
-      { id: 's5', label: 'Couverture de survie', max: 4 },
-      { id: 's6', label: 'Corne de brume', max: 1 },
-      { id: 's7', label: 'Trousse premiers secours', max: 1 },
-      { id: 's8', label: 'Ancre + chaîne', max: 1 },
-    ]
-  },
-  {
-    category: '🍽 Cuisine & vaisselle',
-    items: [
-      { id: 'c1', label: 'Assiettes', max: 12 },
-      { id: 'c2', label: 'Bols', max: 12 },
-      { id: 'c3', label: 'Verres', max: 12 },
-      { id: 'c4', label: 'Tasses', max: 12 },
-      { id: 'c5', label: 'Couverts complets', max: 12 },
-      { id: 'c6', label: 'Casseroles', max: 4 },
-      { id: 'c7', label: 'Poêle', max: 2 },
-      { id: 'c8', label: 'Ouvre-boîte', max: 2 },
-      { id: 'c9', label: 'Tire-bouchon', max: 2 },
-      { id: 'c10', label: 'Planche à découper', max: 2 },
-    ]
-  },
-  {
-    category: '🛏 Cabines & confort',
-    items: [
-      { id: 'b1', label: 'Oreillers', max: 12 },
-      { id: 'b2', label: 'Couvertures', max: 6 },
-      { id: 'b3', label: 'Rouleaux papier toilette', max: 12 },
-      { id: 'b4', label: 'Produit vaisselle', max: 2 },
-      { id: 'b5', label: 'Éponges', max: 4 },
-      { id: 'b6', label: 'Poubelles avec sacs', max: 4 },
-    ]
-  },
-  {
+// La checklist s'adapte au bateau réel (capacité, nombre de lits, type) et à CETTE
+// location précise (draps commandés, options prises comme le SUP) — plutôt qu'une
+// liste figée identique pour un semi-rigide 2 places et un catamaran 12 personnes.
+function buildChecklist(boat, booking) {
+  const capacite = boat?.capacite || 8
+  const cabines = boat?.cabines ?? 3
+  const lits = boat?.lits ?? (cabines * 2)
+  const isDayBoat = cabines === 0 // semi-rigide / bateau à moteur sans cabine
+
+  const sections = [
+    {
+      category: '🔴 Sécurité obligatoire',
+      items: isDayBoat ? [
+        { id: 's1', label: 'Gilets de sauvetage', max: capacite },
+        { id: 's3', label: 'Extincteur', max: 1 },
+        { id: 's7', label: 'Trousse premiers secours', max: 1 },
+      ] : [
+        { id: 's1', label: 'Gilets de sauvetage', max: capacite },
+        { id: 's2', label: 'Fusées de détresse', max: 6 },
+        { id: 's3', label: 'Extincteur', max: 2 },
+        { id: 's4', label: 'Balise EPIRB', max: 1 },
+        { id: 's5', label: 'Couverture de survie', max: Math.min(capacite, 4) },
+        { id: 's6', label: 'Corne de brume', max: 1 },
+        { id: 's7', label: 'Trousse premiers secours', max: 1 },
+        { id: 's8', label: 'Ancre + chaîne', max: 1 },
+      ],
+    },
+  ]
+
+  // Cuisine et cabines n'existent pas sur un day boat (semi-rigide) — inutile de les vérifier.
+  if (!isDayBoat) {
+    sections.push({
+      category: '🍽 Cuisine & vaisselle',
+      items: [
+        { id: 'c1', label: 'Assiettes', max: capacite },
+        { id: 'c2', label: 'Bols', max: capacite },
+        { id: 'c3', label: 'Verres', max: capacite },
+        { id: 'c4', label: 'Tasses', max: capacite },
+        { id: 'c5', label: 'Couverts complets', max: capacite },
+        { id: 'c6', label: 'Casseroles', max: 4 },
+        { id: 'c7', label: 'Poêle', max: 2 },
+        { id: 'c8', label: 'Ouvre-boîte', max: 1 },
+        { id: 'c9', label: 'Tire-bouchon', max: 1 },
+        { id: 'c10', label: 'Planche à découper', max: 2 },
+      ],
+    })
+    sections.push({
+      category: '🛏 Cabines & confort',
+      items: [
+        { id: 'b1', label: 'Oreillers', max: lits },
+        { id: 'b2', label: 'Couvertures', max: lits },
+        { id: 'b3', label: 'Rouleaux papier toilette', max: Math.max(cabines, 2) },
+        { id: 'b4', label: 'Produit vaisselle', max: 1 },
+        { id: 'b5', label: 'Éponges', max: 2 },
+        { id: 'b6', label: 'Poubelles avec sacs', max: Math.max(cabines, 2) },
+      ],
+    })
+  }
+
+  sections.push({
     category: '⚓ Équipement nautique',
-    items: [
-      { id: 'n1', label: 'Jerricane carburant (plein)', max: 4 },
+    items: isDayBoat ? [
+      { id: 'n1', label: 'Jerricane carburant (plein)', max: 1 },
+      { id: 'n2', label: 'Fenders', max: 4 },
+      { id: 'n4', label: 'Gaffe', max: 1 },
+    ] : [
+      { id: 'n1', label: 'Jerricane carburant (plein)', max: 2 },
       { id: 'n2', label: 'Fenders', max: 8 },
       { id: 'n3', label: 'Aussières', max: 6 },
       { id: 'n4', label: 'Gaffe', max: 1 },
-      { id: 'n5', label: 'Pagaies SUP', max: 4 },
-      { id: 'n6', label: 'Gilets SUP', max: 4 },
-      { id: 'n7', label: 'Masques & tubas', max: 6 },
-    ]
-  },
-]
+    ],
+  })
 
-const ALL_ITEMS = CHECKLIST.flatMap(c => c.items)
+  // Draps et options réellement pris sur CETTE location (ex: SUP, masque...) —
+  // s'ils ne sont pas réservés, ils n'apparaissent pas du tout dans le check-in.
+  const dynamicItems = []
+  ;(booking?.draps || []).forEach((d, i) => dynamicItems.push({ id: `drap-${i}`, label: `Draps — ${d.name} × ${d.qty} ${d.unit}`, max: d.qty }))
+  Object.entries(booking?.options || {}).forEach(([optId, val]) => {
+    if (!val) return
+    const opt = OPTIONS_CATALOG.find(o => o.id === optId)
+    if (!opt) return
+    const qty = typeof val === 'object' ? val.qty : 1
+    dynamicItems.push({ id: `opt-${optId}`, label: qty > 1 ? `${opt.label} × ${qty}` : opt.label, max: qty })
+  })
+  if (dynamicItems.length > 0) {
+    sections.push({ category: '🎒 Draps & options de cette location', items: dynamicItems })
+  }
+
+  return sections
+}
 
 export default function CheckIn({ booking, onClose, onComplete }) {
+  const boat = BOATS.find(b => b.id === booking.boatId)
+  const CHECKLIST = buildChecklist(boat, booking)
+  const ALL_ITEMS = CHECKLIST.flatMap(c => c.items)
   const [checked, setChecked] = useState({})
   const [missing, setMissing] = useState({})
   const [remarks, setRemarks] = useState('')

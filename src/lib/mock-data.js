@@ -151,7 +151,7 @@ export const BOATS = [
   {
     id: 'mn-1', brand: 'midi-nautisme', name: 'Dufour 360 GL — Yume',
     type: 'Voilier', modele: 'Dufour 360 GL', length: 10.40, annee: 2021,
-    capacite: 8, cabines: 3, port: 'Vieux-Port',
+    capacite: 8, cabines: 3, lits: 6, port: 'Vieux-Port',
     immat: 'FR-13001-A',
     docs: {
       francisation: { status: 'ok', expires: '2027-03-15', label: 'À jour' },
@@ -163,7 +163,7 @@ export const BOATS = [
   {
     id: 'mn-2', brand: 'midi-nautisme', name: 'Dufour 382 GL — Kalliste',
     type: 'Voilier', modele: 'Dufour 382 GL', length: 11.25, annee: 2017,
-    capacite: 8, cabines: 3, port: 'Vieux-Port',
+    capacite: 8, cabines: 3, lits: 6, port: 'Vieux-Port',
     immat: 'FR-13002-B',
     docs: {
       francisation: { status: 'ok', expires: '2027-02-01', label: 'À jour' },
@@ -175,7 +175,7 @@ export const BOATS = [
   {
     id: 'mn-3', brand: 'midi-nautisme', name: 'Dufour 390 — Juleroga',
     type: 'Voilier', modele: 'Dufour 390', length: 11.94, annee: 2023,
-    capacite: 8, cabines: 3, port: 'Vieux-Port',
+    capacite: 8, cabines: 3, lits: 6, port: 'Vieux-Port',
     immat: 'FR-13003-C',
     docs: {
       francisation: { status: 'ok', expires: '2027-01-01', label: 'À jour' },
@@ -187,7 +187,7 @@ export const BOATS = [
   {
     id: 'mn-4', brand: 'midi-nautisme', name: 'Dufour 350',
     type: 'Voilier', modele: 'Dufour 350', length: 10.28, annee: 2016,
-    capacite: 8, cabines: 3, port: 'Vieux-Port',
+    capacite: 8, cabines: 3, lits: 6, port: 'Vieux-Port',
     immat: 'FR-13004-D',
     docs: {
       francisation: { status: 'ok', expires: '2027-06-01', label: 'À jour' },
@@ -200,7 +200,7 @@ export const BOATS = [
   {
     id: 'mn-5', brand: 'midi-nautisme', name: 'Astrea 42 — Bôrev',
     type: 'Catamaran', modele: 'Fountaine Pajot Astrea 42', length: 12.58, annee: 2025,
-    capacite: 9, cabines: 4, port: 'Port Corbières',
+    capacite: 9, cabines: 4, lits: 8, port: 'Port Corbières',
     immat: 'FR-13005-E',
     docs: {
       francisation: { status: 'ok', expires: '2028-01-01', label: 'À jour' },
@@ -212,7 +212,7 @@ export const BOATS = [
   {
     id: 'mn-6', brand: 'midi-nautisme', name: '460 — L\'After',
     type: 'Catamaran', modele: 'Fountaine Pajot 460', length: 14.60, annee: 2025,
-    capacite: 10, cabines: 5, port: 'Port Corbières',
+    capacite: 10, cabines: 5, lits: 10, port: 'Port Corbières',
     immat: 'FR-13006-F',
     docs: {
       francisation: { status: 'ok', expires: '2028-01-01', label: 'À jour' },
@@ -224,7 +224,7 @@ export const BOATS = [
   {
     id: 'mn-7', brand: 'midi-nautisme', name: 'Bali 4.1 · 6 cabines',
     type: 'Catamaran', modele: 'Bali 4.1', length: 12.12, annee: 2021,
-    capacite: 12, cabines: 6, port: 'Port Corbières',
+    capacite: 12, cabines: 6, lits: 12, port: 'Port Corbières',
     immat: 'FR-13007-G',
     docs: {
       francisation: { status: 'ok', expires: '2027-04-01', label: 'À jour' },
@@ -236,7 +236,7 @@ export const BOATS = [
   {
     id: 'mn-8', brand: 'midi-nautisme', name: 'Elba 45 — Sirena',
     type: 'Catamaran', modele: 'Fountaine Pajot Elba 45', length: 13.66, annee: 2022,
-    capacite: 10, cabines: 4, port: 'Port Corbières',
+    capacite: 10, cabines: 4, lits: 8, port: 'Port Corbières',
     immat: 'FR-13008-H',
     docs: {
       francisation: { status: 'ok', expires: '2027-09-01', label: 'À jour' },
@@ -248,7 +248,7 @@ export const BOATS = [
   {
     id: 'mn-9', brand: 'midi-nautisme', name: 'Dufour 48 — Petrel',
     type: 'Voilier', modele: 'Dufour 48', length: 14.40, annee: 2024,
-    capacite: 10, cabines: 5, port: 'Vieux-Port',
+    capacite: 10, cabines: 5, lits: 10, port: 'Vieux-Port',
     immat: 'FR-13009-I',
     docs: {
       francisation: { status: 'ok', expires: '2028-02-01', label: 'À jour' },
@@ -260,7 +260,7 @@ export const BOATS = [
   {
     id: 'mn-10', brand: 'midi-nautisme', name: 'MY40 — Calypso',
     type: 'Catamaran à moteur', modele: 'Fountaine Pajot MY40', length: 12.0, annee: 2023,
-    capacite: 8, cabines: 4, port: 'Port Corbières',
+    capacite: 8, cabines: 4, lits: 8, port: 'Port Corbières',
     immat: 'FR-13010-J',
     docs: {
       francisation: { status: 'ok', expires: '2027-07-01', label: 'À jour' },
@@ -272,7 +272,7 @@ export const BOATS = [
   {
     id: 'mn-11', brand: 'midi-nautisme', name: 'Dufour 41 — Lou Calèu',
     type: 'Voilier', modele: 'Dufour 41', length: 12.5, annee: 2022,
-    capacite: 8, cabines: 4, port: 'Vieux-Port',
+    capacite: 8, cabines: 4, lits: 8, port: 'Vieux-Port',
     immat: 'FR-13011-K',
     docs: {
       francisation: { status: 'ok', expires: '2027-05-01', label: 'À jour' },
@@ -285,7 +285,7 @@ export const BOATS = [
   {
     id: 'lm-1', brand: 'locamotors', name: 'Tempest 505',
     type: 'Semi-rigide', modele: 'Tempest 505', length: 5.0, annee: 2022,
-    capacite: 8, cabines: 0, port: 'Panne Saint Jean',
+    capacite: 8, cabines: 0, lits: 0, port: 'Panne Saint Jean',
     immat: 'FR-13010-A',
     docs: {
       francisation: { status: 'ok', expires: '2027-01-01', label: 'À jour' },
@@ -297,7 +297,7 @@ export const BOATS = [
   {
     id: 'lm-2', brand: 'locamotors', name: 'BSC 65',
     type: 'Semi-rigide', modele: 'BSC 65', length: 6.5, annee: 2021,
-    capacite: 8, cabines: 0, port: 'Panne Saint Jean',
+    capacite: 8, cabines: 0, lits: 0, port: 'Panne Saint Jean',
     immat: 'FR-13011-B',
     docs: {
       francisation: { status: 'ok', expires: '2027-02-01', label: 'À jour' },
@@ -309,7 +309,7 @@ export const BOATS = [
   {
     id: 'lm-3', brand: 'locamotors', name: 'Pacific Craft 730',
     type: 'Moteur', modele: 'Pacific Craft 730', length: 7.3, annee: 2023,
-    capacite: 8, cabines: 0, port: 'Panne Saint Jean',
+    capacite: 8, cabines: 0, lits: 0, port: 'Panne Saint Jean',
     immat: 'FR-13012-C',
     docs: {
       francisation: { status: 'ok', expires: '2027-08-01', label: 'À jour' },

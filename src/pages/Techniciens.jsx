@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { Plus, X, Check, AlertTriangle, Bell, ChevronRight, MapPin, Calendar, Clock } from 'lucide-react'
-import { parseISO, addDays, format } from 'date-fns'
+import { useState, useEffect } from 'react'
+import { Plus, X, Check, AlertTriangle, Bell, ChevronRight, MapPin, Calendar, Clock, UserCog } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { BOATS, BOOKINGS, TECHNICIANS } from '@/lib/mock-data'
+import { TECHNICIANS } from '@/lib/mock-data'
+import { getMissionsForTech } from '@/lib/tech-missions'
+import { getState, subscribe, getTechTasks, toggleTask as sharedToggleTask, assignMission, resolveMissionRequest } from '@/lib/shared-state'
 import { Card, SectionLabel } from '@/components/ui'
 
 const BASES = [
@@ -10,103 +12,22 @@ const BASES = [
   { id: 'base-2', name: 'Port Corbières', port: 'Port de Corbières — Marseille' },
 ]
 
-const TODAY_STR = '2026-07-04'
-
-// Calcule le samedi de la semaine courante (ou égal si déjà samedi) — même logique que Dashboard/Planning.
-function getSaturdayOnOrBefore(date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = (day + 1) % 7
-  d.setDate(d.getDate() - diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-const DEFAULT_DEPART_TASKS = [
-  { label: 'Nettoyage cabines' },
-  { label: 'Draps posés' },
-  { label: 'Inventaire vérifié' },
-  { label: 'Équipements sécurité' },
-]
-// Retour avec dernière nuit à bord : le client part samedi matin (~10h), le technicien
-// fait l'état des lieux après son départ.
-const RETOUR_SAMEDI_TASKS = [
-  { label: 'Vérification état général' },
-  { label: 'Inventaire retour' },
-  { label: 'Nettoyage' },
-  { label: 'Rapport état des lieux' },
-]
-// Retour SANS dernière nuit à bord : le client rend le bateau vendredi soir, le technicien
-// fait le check-out avec lui sur place, puis prépare déjà draps/nettoyage.
-const RETOUR_VENDREDI_TASKS = [
-  { label: 'Check-out avec le client' },
-  { label: 'Draps retirés' },
-  { label: 'Nettoyage' },
-  { label: 'Rapport état des lieux' },
-]
-
-function computeStatut(dateStr) {
-  if (dateStr === TODAY_STR) return 'en_cours'
-  if (dateStr < TODAY_STR) return 'termine'
-  return 'a_venir'
-}
-
-// ── Construit les missions de chaque technicien à partir des VRAIES locations ──
-// (au lieu d'une liste fictive) : pour chaque bateau qui lui est assigné, on regarde
-// les locations réelles (BOOKINGS) et on génère un départ + un retour par location.
-// Le retour tient compte de la nuitée à bord : sans nuitée, il a lieu vendredi soir
-// (avec check-out client) ; avec nuitée, samedi matin.
-function buildTechsFromBookings() {
-  return TECHNICIANS.map(tech => {
-    const missions = []
-    tech.assignedBoats.forEach(boatId => {
-      const boat = BOATS.find(b => b.id === boatId)
-      if (!boat) return
-      const boatBookings = BOOKINGS.filter(b => b.boatId === boatId)
-      const seedTasks = tech.tasks?.[boatId] // tâches spécifiques déjà présentes dans les données de démo, si dispo
-
-      boatBookings.forEach(b => {
-        // ── Départ (préparation du bateau pour ce client) ──
-        const departDate = b.start
-        missions.push({
-          id: `dep-${tech.id}-${b.id}`,
-          type: 'depart',
-          date: departDate,
-          weekStart: format(getSaturdayOnOrBefore(parseISO(departDate)), 'yyyy-MM-dd'),
-          boat: boat.name,
-          client: b.client,
-          heure: '08:30',
-          statut: computeStatut(departDate),
-          tasks: (seedTasks && seedTasks.length ? seedTasks : DEFAULT_DEPART_TASKS).map((t, i) => ({ id: t.id || `${tech.id}-${b.id}-d${i}`, label: t.label, done: t.done ?? false })),
-        })
-
-        // ── Retour (état des lieux au retour de ce client) ──
-        const hasLastNight = b.lastNightAboard !== false
-        const retourDate = hasLastNight ? b.end : format(addDays(parseISO(b.end), -1), 'yyyy-MM-dd')
-        const retourHeure = hasLastNight ? '10:00' : '17:00'
-        const retourTasks = hasLastNight ? RETOUR_SAMEDI_TASKS : RETOUR_VENDREDI_TASKS
-        missions.push({
-          id: `ret-${tech.id}-${b.id}`,
-          type: 'retour',
-          date: retourDate,
-          weekStart: format(getSaturdayOnOrBefore(parseISO(retourDate)), 'yyyy-MM-dd'),
-          boat: boat.name,
-          client: b.client,
-          heure: retourHeure,
-          moment: hasLastNight ? 'Samedi matin' : 'Vendredi soir',
-          statut: computeStatut(retourDate),
-          tasks: retourTasks.map((t, i) => ({ id: `${tech.id}-${b.id}-r${i}`, label: t.label, done: false })),
-        })
-      })
+// ── Construit les techniciens avec leurs vraies missions ──
+// Source UNIQUE partagée avec l'app technicien (src/lib/tech-missions.js) : les deux
+// affichent exactement les mêmes missions, et une réassignation faite ici se reflète
+// immédiatement chez le technicien concerné.
+function buildTechsFromBookings(extraTechs) {
+  return [...TECHNICIANS, ...extraTechs].map(tech => {
+    const missions = getMissionsForTech(tech.id).map(m => {
+      const seedTasks = tech.tasks?.[m.boatId] // tâches spécifiques déjà présentes dans les données de démo, si dispo
+      const defaultTasks = (seedTasks && seedTasks.length ? seedTasks : m.defaultTasks).map((t, i) => ({ id: `${m.key}-${i}`, label: t.label, done: t.done ?? false }))
+      return { ...m, tasks: getTechTasks(tech.id, m.key, defaultTasks) }
     })
-    // Ordre chronologique, et à date égale, les retours priment sur les départs
-    // (le bateau doit être rendu avant de pouvoir repartir).
-    missions.sort((a, b) => a.date.localeCompare(b.date) || (a.type === 'retour' ? -1 : 1) - (b.type === 'retour' ? -1 : 1))
     return { id: tech.id, name: tech.name, phone: tech.phone, base: tech.base, planning: missions, notifications: [] }
   })
 }
 
-function PlanningTech({ tech, onClose, onToggleTask }) {
+function PlanningTech({ tech, onClose, onToggleTask, onReassign }) {
   const [activeItem, setActiveItem] = useState(null)
   const unread = tech.notifications.filter(n => !n.read).length
 
@@ -238,7 +159,7 @@ function PlanningTech({ tech, onClose, onToggleTask }) {
 
                               {isActive && (
                                 <div className="border-t border-gray-100 p-3 bg-white">
-                                  <div className="flex flex-col gap-1.5">
+                                  <div className="flex flex-col gap-1.5 mb-3">
                                     {item.tasks.map(task => (
                                       <div
                                         key={task.id}
@@ -251,6 +172,19 @@ function PlanningTech({ tech, onClose, onToggleTask }) {
                                         <span className={`text-sm ${task.done ? 'text-teal-700 line-through opacity-60' : 'text-gray-700'}`}>{task.label}</span>
                                       </div>
                                     ))}
+                                  </div>
+                                  <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                                    <UserCog size={12} className="text-gray-400 flex-shrink-0" />
+                                    <span className="text-[10px] text-gray-400 flex-shrink-0">Réassigner à :</span>
+                                    <select
+                                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white flex-1"
+                                      value={tech.id}
+                                      onChange={e => onReassign(item.key, e.target.value)}
+                                    >
+                                      {[tech, ...TECHNICIANS.filter(t => t.id !== tech.id)].map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
                               )}
@@ -271,33 +205,34 @@ function PlanningTech({ tech, onClose, onToggleTask }) {
 }
 
 export default function Techniciens() {
-  const [techs, setTechs] = useState(buildTechsFromBookings)
+  const [sharedState, setSharedState] = useState(getState())
+  const [extraTechs, setExtraTechs] = useState([])
   const [selected, setSelected] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newBase, setNewBase] = useState(BASES[0].name)
 
-  function toggleTask(techId, planId, taskId) {
-    setTechs(prev => prev.map(t => {
-      if (t.id !== techId) return t
-      return {
-        ...t,
-        planning: t.planning.map(p => {
-          if (p.id !== planId) return p
-          return { ...p, tasks: p.tasks.map(tk => tk.id === taskId ? { ...tk, done: !tk.done } : tk) }
-        })
-      }
-    }))
+  useEffect(() => subscribe(s => setSharedState(s)), [])
+
+  const techs = buildTechsFromBookings(extraTechs)
+  const openRequests = sharedState.missionRequests.filter(r => r.status === 'open')
+
+  function toggleTask(techId, missionKey, taskId) {
+    sharedToggleTask(techId, missionKey, taskId)
+  }
+
+  function reassign(missionKey, newTechId) {
+    assignMission(missionKey, newTechId)
   }
 
   function addTech() {
     if (!newName.trim()) return
-    setTechs(prev => [...prev, {
+    setExtraTechs(prev => [...prev, {
       id: 'tech-' + Date.now(), name: newName, phone: newPhone, base: newBase,
-      planning: [], notifications: [],
+      assignedBoats: [], tasks: {},
     }])
-    setNewName(''); setNewPhone(''); setNewBase('base-1'); setShowNew(false)
+    setNewName(''); setNewPhone(''); setNewBase(BASES[0].name); setShowNew(false)
   }
 
   const selectedTech = techs.find(t => t.id === selected)
@@ -331,6 +266,39 @@ export default function Techniciens() {
             )
           })}
         </div>
+
+        {/* Demandes en attente des techniciens (empêchement, échange...) */}
+        {openRequests.length > 0 && (
+          <div className="mb-5">
+            <SectionLabel>Demandes en attente</SectionLabel>
+            <div className="flex flex-col gap-2">
+              {openRequests.map(req => {
+                const mission = techs.flatMap(t => t.planning).find(m => m.key === req.missionKey)
+                return (
+                  <div key={req.id} className="rounded-xl border border-amber-100 bg-amber-50 p-3 flex items-center gap-3">
+                    <Bell size={14} className="text-amber-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-amber-800">{req.techName} — {mission ? `${mission.boat} · ${mission.type === 'depart' ? 'Départ' : 'Retour'}` : 'Mission'}</p>
+                      <p className="text-xs text-amber-700">{req.message}</p>
+                    </div>
+                    <select
+                      className="text-xs border border-amber-200 rounded-lg px-2 py-1.5 bg-white flex-shrink-0"
+                      defaultValue=""
+                      onChange={e => {
+                        if (!e.target.value) return
+                        reassign(req.missionKey, e.target.value)
+                        resolveMissionRequest(req.id)
+                      }}
+                    >
+                      <option value="">Réassigner à…</option>
+                      {TECHNICIANS.filter(t => t.id !== req.techId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Techniciens */}
         <SectionLabel>Équipe</SectionLabel>
@@ -397,6 +365,7 @@ export default function Techniciens() {
           tech={selectedTech}
           onClose={() => setSelected(null)}
           onToggleTask={toggleTask}
+          onReassign={reassign}
         />
       )}
 
