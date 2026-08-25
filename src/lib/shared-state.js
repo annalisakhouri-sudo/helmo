@@ -15,6 +15,8 @@ let state = {
   // Notes libres du technicien sur une mission (départ ou retour), accessibles depuis
   // la fiche mission. bookingId -> texte.
   missionNotes: {},
+  // contracts : voir les fonctions getContract/setContractTemplate/updateContractContent/sendContract plus bas
+  contracts: {},
   checkIns: {}, // bookingId -> { done: bool, signature: bool, remarks: string, missing: {} }
   // checkInProgress : état du check-in EN COURS (avant signature), pour qu'un technicien
   // qui ferme la fenêtre sans avoir terminé retrouve tout tel quel en revenant.
@@ -153,6 +155,36 @@ export function toggleMaintenanceTask(bookingId, section, taskId) {
 
 export function setMissionNote(bookingId, text) {
   state = { ...state, missionNotes: { ...state.missionNotes, [bookingId]: text } }
+  listeners.forEach(fn => fn(state))
+}
+
+// ── Contrats ──────────────────────────────────────────────────────
+// contracts : bookingId -> { templateId, content, status: 'brouillon' | 'envoye', sentAt }
+// Le contenu par défaut est généré à la demande (contract.js) dès que la fiche est ouverte
+// pour la première fois — pas besoin d'action explicite à la création de la location.
+export function getContract(bookingId, defaultTemplateId, defaultContent) {
+  if (!state.contracts[bookingId]) {
+    state.contracts[bookingId] = { templateId: defaultTemplateId, content: defaultContent, status: 'brouillon', sentAt: null }
+  }
+  return state.contracts[bookingId]
+}
+
+export function setContractTemplate(bookingId, templateId, content) {
+  const current = state.contracts[bookingId] || { status: 'brouillon', sentAt: null }
+  state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, templateId, content } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function updateContractContent(bookingId, content) {
+  const current = state.contracts[bookingId] || { templateId: null, status: 'brouillon', sentAt: null }
+  state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, content } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function sendContract(bookingId) {
+  const current = state.contracts[bookingId]
+  if (!current) return
+  state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, status: 'envoye', sentAt: '2026-07-04' } } }
   listeners.forEach(fn => fn(state))
 }
 

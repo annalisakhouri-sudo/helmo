@@ -1423,6 +1423,88 @@ export const BOAT_PRICES = {
   'lm-3':  { 'period-1': 1200, 'period-2': 1600, 'period-3': 2200, 'period-4': 1600, 'period-5': 1200 },
 }
 
+export const CONTRACT_TEMPLATES = [
+  {
+    id: 'tpl-standard',
+    label: 'Contrat standard (voilier / catamaran)',
+    body: `CONTRAT DE LOCATION DE BATEAU DE PLAISANCE
+
+Entre les soussignés :
+
+{{company_name}}
+{{company_port}}
+Tél : {{company_phone}} — Email : {{company_email}}
+Ci-après dénommé « le Loueur »,
+
+Et :
+
+{{client_prenom}} {{client_nom}}
+Né(e) le {{client_naissance}}, de nationalité {{client_nationalite}}
+Pièce d'identité n° {{client_piece_numero}}
+Permis {{client_permis_type}} n° {{client_permis_numero}}
+Téléphone : {{client_tel}} — Email : {{client_email}}
+Ci-après dénommé « le Locataire »,
+
+Il a été convenu ce qui suit :
+
+Article 1 — Objet du contrat
+Le Loueur met à disposition du Locataire le bateau {{boat_name}} ({{boat_type}}, {{boat_length}} m, capacité {{boat_capacite}} personnes), pour la période du {{start_date}} au {{end_date}}.
+
+Article 2 — Équipage
+Nombre de personnes à bord : {{guests}}
+Skipper : {{skipper_info}}
+
+Article 3 — Prix et caution
+Prix de la location : {{price}}
+Montant de la caution : {{caution_montant}} (mode : {{caution_mode}})
+
+Article 4 — Options et prestations complémentaires
+{{options_list}}
+
+Article 5 — Obligations du Locataire
+Le Locataire s'engage à restituer le bateau dans l'état où il l'a reçu, à respecter les règles de sécurité maritime en vigueur, et à signaler immédiatement tout incident survenu pendant la location.
+
+Fait à Marseille, le {{today}}.
+
+Signature du Loueur                                    Signature du Locataire`,
+  },
+  {
+    id: 'tpl-day',
+    label: 'Contrat journée (semi-rigide / moteur)',
+    body: `CONTRAT DE LOCATION — SORTIE À LA JOURNÉE
+
+Entre les soussignés :
+
+{{company_name}}
+{{company_port}}
+Tél : {{company_phone}} — Email : {{company_email}}
+Ci-après dénommé « le Loueur »,
+
+Et :
+
+{{client_prenom}} {{client_nom}}
+Permis {{client_permis_type}} n° {{client_permis_numero}}
+Téléphone : {{client_tel}} — Email : {{client_email}}
+Ci-après dénommé « le Locataire »,
+
+Article 1 — Objet
+Location du bateau {{boat_name}} ({{boat_type}}, {{boat_length}} m) du {{start_date}} au {{end_date}}.
+
+Article 2 — Prix et caution
+Prix : {{price}} — Caution : {{caution_montant}} ({{caution_mode}})
+
+Article 3 — Options
+{{options_list}}
+
+Article 4 — Sécurité
+Le Locataire déclare avoir pris connaissance des consignes de sécurité et s'engage à les respecter.
+
+Fait à Marseille, le {{today}}.
+
+Signature du Loueur                                    Signature du Locataire`,
+  },
+]
+
 export const OPTIONS_CATALOG = [
   { id: 'skipper', label: 'Skipper', icon: 'Anchor', hasSub: true, price: 180, unit: '/ jour', active: true, description: 'Skipper professionnel pour la durée de la location' },
   { id: 'draps', label: 'Draps & linge', icon: 'Shirt', hasSub: true, price: 15, unit: '/ jeu', active: true, description: 'Jeu de draps et serviettes par cabine' },

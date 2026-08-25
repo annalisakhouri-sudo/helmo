@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import React from 'react'
-import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck, CircleCheck } from 'lucide-react'
-import { TECHNICIANS, BOATS } from '@/lib/mock-data'
+import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck, CircleCheck, Tag } from 'lucide-react'
+import { TECHNICIANS, BOATS, OPTIONS_CATALOG } from '@/lib/mock-data'
 import { Card, SectionLabel, ProgressBar } from '@/components/ui'
 import CheckIn from './CheckIn'
+import ContractModal from './ContractModal'
 import { getState, subscribe, completeCheckIn, getMaintenanceTasks } from '@/lib/shared-state'
 import { buildChecklist } from './MaintenanceModal'
 
@@ -14,6 +15,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
   const boat = BOATS.find(b => b.id === booking.boatId)
   const techs = TECHNICIANS.filter(t => t.assignedBoats.includes(booking.boatId))
   const [showCheckIn, setShowCheckIn] = useState(false)
+  const [showContract, setShowContract] = useState(false)
   const [sharedState, setSharedState] = useState(getState())
   const [, forceUpdate] = useState(0) // force le re-render local après mutation directe de booking
   
@@ -93,6 +95,25 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                 </div>
               )}
 
+              {booking.options && Object.entries(booking.options).some(([, v]) => v) && (
+                <div>
+                  <SectionLabel>Options réservées</SectionLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(booking.options).filter(([, v]) => v).map(([optId, val]) => {
+                      const opt = OPTIONS_CATALOG.find(o => o.id === optId)
+                      if (!opt) return null
+                      const qty = typeof val === 'object' ? val.qty : null
+                      return (
+                        <div key={optId} className="card-sm">
+                          <div className="flex items-center gap-1 mb-0.5"><Tag size={11} className="text-navy-600" /><span className="text-xs font-medium">{opt.label}</span></div>
+                          {qty ? <p className="text-[10px] text-navy-600">× {qty}</p> : <p className="text-[10px] text-teal-600">Inclus</p>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <SectionLabel>Skipper</SectionLabel>
                 {booking.skipperName ? (
@@ -129,6 +150,27 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Contrat de location */}
+              <div>
+                <SectionLabel>Contrat</SectionLabel>
+                {(() => {
+                  const contractState = sharedState.contracts[booking.id]
+                  const sent = contractState?.status === 'envoye'
+                  return (
+                    <div
+                      className={`flex items-center gap-2.5 rounded-xl p-3 border cursor-pointer transition-colors ${sent ? 'bg-teal-50 border-teal-100 hover:bg-teal-100' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`}
+                      onClick={() => setShowContract(true)}
+                    >
+                      <FileText size={18} className={sent ? 'text-teal-600 flex-shrink-0' : 'text-gray-400 flex-shrink-0'} />
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${sent ? 'text-teal-800' : 'text-gray-700'}`}>{sent ? 'Contrat envoyé au client' : 'Contrat en brouillon'}</p>
+                        <p className={`text-xs ${sent ? 'text-teal-600' : 'text-gray-400'}`}>{sent ? `Envoyé le ${contractState.sentAt} · PDF disponible` : 'Cliquer pour voir, modifier et envoyer'}</p>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Check-in (toujours visible, quel que soit le contexte) */}
@@ -255,6 +297,10 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
           onClose={() => setShowCheckIn(false)}
           onComplete={() => { setShowCheckIn(false) }}
         />
+      )}
+
+      {showContract && (
+        <ContractModal booking={booking} onClose={() => setShowContract(false)} />
       )}
     </>
   )
