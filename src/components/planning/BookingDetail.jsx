@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import React from 'react'
-import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck, CircleCheck, Tag } from 'lucide-react'
+import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck, CircleCheck, Tag, AlertTriangle } from 'lucide-react'
 import { TECHNICIANS, BOATS, OPTIONS_CATALOG } from '@/lib/mock-data'
 import { Card, SectionLabel, ProgressBar } from '@/components/ui'
 import CheckIn from './CheckIn'
@@ -157,16 +157,32 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                 <SectionLabel>Contrat</SectionLabel>
                 {(() => {
                   const contractState = sharedState.contracts[booking.id]
-                  const sent = contractState?.status === 'envoye'
+                  const status = contractState?.status || 'brouillon'
+                  const daysSinceSent = status === 'envoye' && contractState.sentAt ? Math.floor((new Date('2026-07-04') - new Date(contractState.sentAt)) / (1000 * 60 * 60 * 24)) : 0
+                  const overdue = status === 'envoye' && daysSinceSent >= 7
+                  const style = status === 'signe' ? 'bg-teal-50 border-teal-100 hover:bg-teal-100'
+                    : overdue ? 'bg-amber-50 border-amber-100 hover:bg-amber-100'
+                    : status === 'envoye' ? 'bg-navy-50 border-navy-100 hover:bg-navy-100'
+                    : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
+                  const iconColor = status === 'signe' ? 'text-teal-600' : overdue ? 'text-amber-600' : status === 'envoye' ? 'text-navy-600' : 'text-gray-400'
+                  const titleColor = status === 'signe' ? 'text-teal-800' : overdue ? 'text-amber-800' : status === 'envoye' ? 'text-navy-800' : 'text-gray-700'
+                  const subColor = status === 'signe' ? 'text-teal-600' : overdue ? 'text-amber-700' : status === 'envoye' ? 'text-navy-600' : 'text-gray-400'
+                  const title = status === 'signe' ? 'Contrat signé reçu'
+                    : overdue ? `Envoyé il y a ${daysSinceSent} jours — pas de retour`
+                    : status === 'envoye' ? 'Contrat envoyé au client'
+                    : 'Contrat en brouillon'
+                  const subtitle = status === 'signe' ? `Reçu le ${contractState.signedAt} · dans les documents`
+                    : status === 'envoye' ? `Envoyé le ${contractState.sentAt} · en attente de signature`
+                    : 'Cliquer pour voir, modifier et envoyer'
                   return (
                     <div
-                      className={`flex items-center gap-2.5 rounded-xl p-3 border cursor-pointer transition-colors ${sent ? 'bg-teal-50 border-teal-100 hover:bg-teal-100' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`}
+                      className={`flex items-center gap-2.5 rounded-xl p-3 border cursor-pointer transition-colors ${style}`}
                       onClick={() => setShowContract(true)}
                     >
-                      <FileText size={18} className={sent ? 'text-teal-600 flex-shrink-0' : 'text-gray-400 flex-shrink-0'} />
+                      {overdue ? <AlertTriangle size={18} className={`${iconColor} flex-shrink-0`} /> : <FileText size={18} className={`${iconColor} flex-shrink-0`} />}
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${sent ? 'text-teal-800' : 'text-gray-700'}`}>{sent ? 'Contrat envoyé au client' : 'Contrat en brouillon'}</p>
-                        <p className={`text-xs ${sent ? 'text-teal-600' : 'text-gray-400'}`}>{sent ? `Envoyé le ${contractState.sentAt} · PDF disponible` : 'Cliquer pour voir, modifier et envoyer'}</p>
+                        <p className={`text-sm font-medium ${titleColor}`}>{title}</p>
+                        <p className={`text-xs ${subColor}`}>{subtitle}</p>
                       </div>
                     </div>
                   )

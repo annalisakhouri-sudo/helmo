@@ -21,6 +21,12 @@ export function buildContractContent(booking, templateId) {
   const client = CLIENTS.find(c => c.id === booking.clientId) || CLIENTS.find(c => c.locations?.includes(booking.id))
   const template = CONTRACT_TEMPLATES.find(t => t.id === templateId) || CONTRACT_TEMPLATES[0]
 
+  // Pour une location tout juste créée, le client n'existe pas encore dans la table
+  // CLIENTS — on retombe sur les infos saisies directement sur la location.
+  const fullName = (booking.client || '').trim().split(' ')
+  const fallbackPrenom = fullName.slice(0, -1).join(' ') || fullName[0] || ''
+  const fallbackNom = fullName.length > 1 ? fullName[fullName.length - 1] : ''
+
   const optionsList = Object.entries(booking.options || {})
     .filter(([, v]) => v)
     .map(([id, val]) => {
@@ -38,8 +44,8 @@ export function buildContractContent(booking, templateId) {
     company_port: brand?.port || '',
     company_phone: brand?.phone || '',
     company_email: brand?.email || '',
-    client_nom: client?.nom || '',
-    client_prenom: client?.prenom || '',
+    client_nom: client?.nom || fallbackNom,
+    client_prenom: client?.prenom || fallbackPrenom,
     client_naissance: client?.naissance || 'Non renseignée',
     client_nationalite: client?.nationalite || 'Non renseignée',
     client_piece_numero: client?.pieceId?.numero || 'Non renseigné',

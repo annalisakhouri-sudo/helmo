@@ -1397,6 +1397,22 @@ export const TECHNICIANS = [
   },
 ]
 
+// Prestataires de ménage : équipes TIERCES (sociétés externes, pas des salariés de l'agence),
+// sous-traitées pour le nettoyage entre deux locations. assignedBoats fonctionne comme pour
+// les techniciens, mais isExternal marque bien qu'il s'agit d'une autre entreprise.
+export const MENAGE_PROVIDERS = [
+  {
+    id: 'menage-1', company: 'Nickel Nautique', contact: 'Sophie Durand', phone: '06 70 12 34 56', email: 'contact@nickelnautique.fr',
+    isExternal: true,
+    assignedBoats: ['mn-1', 'mn-2', 'mn-3', 'mn-4', 'mn-9', 'mn-11'],
+  },
+  {
+    id: 'menage-2', company: 'Calanques Propreté', contact: 'Yassine Belkacem', phone: '06 44 98 76 54', email: 'contact@calanquesproprete.fr',
+    isExternal: true,
+    assignedBoats: ['mn-5', 'mn-6', 'mn-7', 'mn-8', 'mn-10', 'lm-1', 'lm-2', 'lm-3'],
+  },
+]
+
 export const PRICING_PERIODS = [
   { id: 'period-1', label: 'Basse saison', start: '2026-01-01', end: '2026-06-27', color: '#0F7D57', rhythm: 'free' },
   { id: 'period-2', label: 'Moyenne saison', start: '2026-06-28', end: '2026-07-04', color: '#B36A0A', rhythm: 'free' },

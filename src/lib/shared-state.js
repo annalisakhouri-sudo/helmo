@@ -15,6 +15,9 @@ let state = {
   // Notes libres du technicien sur une mission (départ ou retour), accessibles depuis
   // la fiche mission. bookingId -> texte.
   missionNotes: {},
+  // menageDone : missionKey -> bool. Le prestataire de ménage étant une société tierce (pas connectée
+  // à Helmo), l'agence coche elle-même quand le nettoyage est confirmé fait.
+  menageDone: {},
   // contracts : voir les fonctions getContract/setContractTemplate/updateContractContent/sendContract plus bas
   contracts: {},
   checkIns: {}, // bookingId -> { done: bool, signature: bool, remarks: string, missing: {} }
@@ -185,6 +188,20 @@ export function sendContract(bookingId) {
   const current = state.contracts[bookingId]
   if (!current) return
   state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, status: 'envoye', sentAt: '2026-07-04' } } }
+  listeners.forEach(fn => fn(state))
+}
+
+// Le client a renvoyé le contrat signé : l'agence le marque comme reçu, il rejoint
+// les documents de la location.
+export function markContractSigned(bookingId) {
+  const current = state.contracts[bookingId]
+  if (!current) return
+  state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, status: 'signe', signedAt: '2026-07-04' } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function toggleMenageDone(missionKey) {
+  state = { ...state, menageDone: { ...state.menageDone, [missionKey]: !state.menageDone[missionKey] } }
   listeners.forEach(fn => fn(state))
 }
 

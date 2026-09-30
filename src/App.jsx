@@ -5,6 +5,7 @@ import Dashboard from '@/pages/Dashboard'
 import Planning from '@/pages/Planning'
 import Skippers from '@/pages/Skippers'
 import Techniciens from '@/pages/Techniciens'
+import Menage from '@/pages/Menage'
 import Bateaux from '@/pages/Bateaux'
 import Options from '@/pages/Options'
 import Clients from '@/pages/Clients'
@@ -58,6 +59,7 @@ function AppWithAuth() {
         { path: 'clients', element: <Clients /> },
         { path: 'skippers', element: <Skippers /> },
         { path: 'techniciens', element: <Techniciens /> },
+        { path: 'menage', element: <Menage /> },
         { path: 'bateaux', element: <Bateaux /> },
         { path: 'options', element: <Options /> },
         { path: 'messagerie', element: <Messagerie /> },

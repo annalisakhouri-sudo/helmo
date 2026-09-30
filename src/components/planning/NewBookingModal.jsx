@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { X, AlertTriangle, Check, CircleCheck } from 'lucide-react'
-import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES } from '@/lib/mock-data'
+import { X, AlertTriangle, Check, CircleCheck, FileText, Send } from 'lucide-react'
+import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, CONTRACT_TEMPLATES } from '@/lib/mock-data'
+import { buildContractContent, getDefaultTemplateId } from '@/lib/contract'
+import { setContractTemplate, sendContract } from '@/lib/shared-state'
 import OptionIcon from '@/components/ui/OptionIcon'
 import DateRangePicker from './DateRangePicker'
 
@@ -26,7 +28,8 @@ const STEPS = [
   { id: 1, label: 'Bateau & dates', icon: '⛵' },
   { id: 2, label: 'Client', icon: '👤' },
   { id: 3, label: 'Options', icon: '⚙️' },
-  { id: 4, label: 'Récap', icon: '✓' },
+  { id: 4, label: 'Contrat', icon: '📄' },
+  { id: 5, label: 'Récap', icon: '✓' },
 ]
 
 const OPTIONS = OPTIONS_CATALOG.filter(o => o.active)
@@ -62,6 +65,10 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
     options: {}, freeOptions: {}, basePrice: '', basePriceAuto: null, discountPercent: '0',
     skipperName: '', cabines: '3', supQty: '2', masqueQty: '3', franchise: '1500', statut: 'confirmed', dureeOption: '48h', lastNightAboard: true,
   })
+
+  const [contractTemplateId, setContractTemplateId] = useState(null)
+  const [contractContent, setContractContent] = useState(null)
+  const [sendContractNow, setSendContractNow] = useState(false)
 
   function set(key, val) {
     setForm(f => {
@@ -125,13 +132,46 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
     const e = {}
     if (form.options.franchise && !form.franchise) e.franchise = 'Indique le montant de la franchise.'
     setErrors(e)
-    if (!Object.keys(e).length) setStep(4)
+    if (!Object.keys(e).length) {
+      setStep(4)
+      if (!contractContent) {
+        const tpl = getDefaultTemplateId(BOATS.find(b => b.id === form.boatId))
+        setContractTemplateId(tpl)
+        setContractContent(buildContractContent(buildBookingFromForm(), tpl))
+      }
+    }
+  }
+
+  function buildBookingFromForm() {
+    const boat = BOATS.find(b => b.id === form.boatId)
+    return {
+      boatId: form.boatId,
+      boatName: boat?.name || '',
+      brand: activeBrand,
+      client: `${form.prenom} ${form.nom}`.trim(),
+      phone: form.tel,
+      guests: form.guests,
+      start: form.dateStart,
+      end: form.dateEnd,
+      draps: form.options.draps ? [{ name: `${form.cabines} cabine(s)`, qty: parseInt(form.cabines), unit: 'jeux' }] : [],
+      options: form.options,
+    }
+  }
+
+  function regenerateContract(templateId) {
+    setContractTemplateId(templateId)
+    setContractContent(buildContractContent(buildBookingFromForm(), templateId))
+  }
+
+  function validate4() {
+    setStep(5)
   }
 
   function confirm() {
     const boat = BOATS.find(b => b.id === form.boatId)
+    const newId = 'bk-new-' + Date.now()
     onAdd && onAdd({
-      id: 'bk-new-' + Date.now(),
+      id: newId,
       boatId: form.boatId,
       boatName: boat?.name || '',
       brand: activeBrand,
@@ -151,6 +191,10 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
       discountPercent: parseFloat(form.discountPercent) || 0,
       lastNightAboard: form.lastNightAboard,
     })
+    if (contractContent) {
+      setContractTemplate(newId, contractTemplateId, contractContent)
+      if (sendContractNow) sendContract(newId)
+    }
     setDone(true)
   }
 
@@ -450,8 +494,41 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
             </div>
           )}
 
-          {/* ÉTAPE 4 — RÉCAP */}
+          {/* ÉTAPE 4 — CONTRAT */}
           {step === 4 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Modèle de contrat</p>
+                <select
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                  value={contractTemplateId || ''}
+                  onChange={e => regenerateContract(e.target.value)}
+                >
+                  {CONTRACT_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+              <textarea
+                className="w-full h-80 text-xs border border-gray-200 rounded-xl p-4 resize-none focus:outline-none focus:border-navy-600 leading-relaxed font-sans mb-4"
+                value={contractContent || ''}
+                onChange={e => setContractContent(e.target.value)}
+              />
+              <label className="flex items-start gap-2.5 bg-navy-50 border border-navy-100 rounded-xl p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={sendContractNow}
+                  onChange={e => setSendContractNow(e.target.checked)}
+                />
+                <div>
+                  <p className="text-sm font-medium text-navy-800">Envoyer le contrat au client dès la création</p>
+                  <p className="text-xs text-navy-600">Sinon, il reste en brouillon et tu pourras l'envoyer plus tard depuis la fiche location.</p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {/* ÉTAPE 5 — RÉCAP */}
+          {step === 5 && (
             <div>
               <div className="card mb-4 py-2 px-4">
                 {[
@@ -530,8 +607,9 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
         <div className="border-t border-gray-100 p-4 flex gap-3 flex-shrink-0">
           {step > 1 && <button className="btn-ghost" onClick={() => setStep(s => s - 1)}>← Retour</button>}
           {step < 3 && <button className="btn-primary flex-1 justify-center" onClick={step === 1 ? validate1 : validate2}>Suivant →</button>}
-          {step === 3 && <button className="btn-primary flex-1 justify-center" onClick={validate3}>Voir le récap →</button>}
-          {step === 4 && <button className="btn-primary flex-1 justify-center" onClick={confirm}><Check size={14} /> Confirmer la location</button>}
+          {step === 3 && <button className="btn-primary flex-1 justify-center" onClick={validate3}>Voir le contrat →</button>}
+          {step === 4 && <button className="btn-primary flex-1 justify-center" onClick={validate4}>Voir le récap →</button>}
+          {step === 5 && <button className="btn-primary flex-1 justify-center" onClick={confirm}><Check size={14} /> Confirmer la location</button>}
         </div>
       </div>
     </div>

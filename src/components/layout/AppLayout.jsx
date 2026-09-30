@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, Calendar, Users, Wrench,
+  LayoutDashboard, Calendar, Users, Wrench, Sparkles,
   Anchor, UserCircle, MessageCircle, LogOut, Tag
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -33,6 +33,7 @@ const NAV = [
     items: [
       { to: '/skippers', label: 'Skippers', icon: Users },
       { to: '/techniciens', label: 'Techniciens', icon: Wrench },
+      { to: '/menage', label: 'Ménage', icon: Sparkles },
       { to: '/messagerie', label: 'Messagerie', icon: MessageCircle },
     ],
   },

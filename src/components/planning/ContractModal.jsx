@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { X, FileText, Download, Send, CircleCheck, RefreshCw } from 'lucide-react'
+import { X, FileText, Download, Send, CircleCheck, RefreshCw, AlertTriangle } from 'lucide-react'
 import { BOATS, CONTRACT_TEMPLATES } from '@/lib/mock-data'
 import { buildContractContent, getDefaultTemplateId } from '@/lib/contract'
-import { getContract, setContractTemplate, updateContractContent, sendContract, subscribe } from '@/lib/shared-state'
+import { getContract, setContractTemplate, updateContractContent, sendContract, markContractSigned, subscribe } from '@/lib/shared-state'
+
+const TODAY = new Date('2026-07-04')
 
 export default function ContractModal({ booking, onClose }) {
   const [, forceUpdate] = useState(0)
@@ -13,6 +15,9 @@ export default function ContractModal({ booking, onClose }) {
   const defaultContent = buildContractContent(booking, defaultTemplateId)
   const contract = getContract(booking.id, defaultTemplateId, defaultContent)
   const isSent = contract.status === 'envoye'
+  const isSigned = contract.status === 'signe'
+  const daysSinceSent = isSent && contract.sentAt ? Math.floor((TODAY - new Date(contract.sentAt)) / (1000 * 60 * 60 * 24)) : 0
+  const isOverdue = isSent && daysSinceSent >= 7
 
   function changeTemplate(templateId) {
     const content = buildContractContent(booking, templateId)
@@ -59,10 +64,15 @@ export default function ContractModal({ booking, onClose }) {
         </div>
 
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          {isSent ? (
+          {isSigned ? (
             <div className="flex items-center gap-2">
               <CircleCheck size={16} className="text-teal-600" />
-              <span className="text-xs font-medium text-teal-700">Envoyé au client le {contract.sentAt}</span>
+              <span className="text-xs font-medium text-teal-700">Signé reçu le {contract.signedAt} — dans les documents de la location</span>
+            </div>
+          ) : isSent ? (
+            <div className="flex items-center gap-2">
+              <CircleCheck size={16} className="text-navy-600" />
+              <span className="text-xs font-medium text-navy-700">Envoyé au client le {contract.sentAt}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -70,7 +80,7 @@ export default function ContractModal({ booking, onClose }) {
               <span className="text-xs text-gray-500">Brouillon — modifiable avant envoi</span>
             </div>
           )}
-          {!isSent && (
+          {!isSent && !isSigned && (
             <select
               className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
               value={contract.templateId || defaultTemplateId}
@@ -81,8 +91,15 @@ export default function ContractModal({ booking, onClose }) {
           )}
         </div>
 
+        {isOverdue && (
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2.5 flex-shrink-0">
+            <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+            <p className="text-xs text-amber-800"><strong>Envoyé il y a {daysSinceSent} jours</strong>, toujours pas de retour signé — pense à relancer le client.</p>
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto p-5">
-          {isSent ? (
+          {isSent || isSigned ? (
             <pre className="text-xs whitespace-pre-wrap font-sans bg-gray-50 rounded-xl p-4 leading-relaxed">{contract.content}</pre>
           ) : (
             <textarea
@@ -94,10 +111,19 @@ export default function ContractModal({ booking, onClose }) {
         </div>
 
         <div className="border-t border-gray-100 p-4 flex gap-3 flex-shrink-0">
-          {isSent ? (
+          {isSigned ? (
             <button className="btn-primary flex-1 justify-center" onClick={downloadPdf}>
               <Download size={14} /> Télécharger le PDF
             </button>
+          ) : isSent ? (
+            <>
+              <button className="btn-ghost" onClick={downloadPdf}>
+                <Download size={14} /> Télécharger le PDF
+              </button>
+              <button className="btn-primary flex-1 justify-center" onClick={() => markContractSigned(booking.id)}>
+                <CircleCheck size={14} /> Marquer comme reçu signé
+              </button>
+            </>
           ) : (
             <>
               <button className="btn-ghost" onClick={regenerate} title="Régénérer depuis les infos actuelles de la location">
