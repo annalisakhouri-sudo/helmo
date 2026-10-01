@@ -1,20 +1,28 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Phone, Mail, Check, ChevronRight, X, Building2 } from 'lucide-react'
+import { Sparkles, Phone, Mail, Check, ChevronRight, X, Building2, Copy, Receipt } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
 import { getMissionsForProvider } from '@/lib/menage-missions'
 import { getState, subscribe, toggleMenageDone } from '@/lib/shared-state'
 import { Card, SectionLabel } from '@/components/ui'
+import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
 function ProviderDetail({ provider, missions, onClose }) {
-  const [activeWeek, setActiveWeek] = useState(null)
+  const [invoiceMission, setInvoiceMission] = useState(null)
+  const [copied, setCopied] = useState(false)
   const groups = []
   missions.forEach(m => {
     let g = groups[groups.length - 1]
     if (!g || g.weekStart !== m.weekStart) { g = { weekStart: m.weekStart, items: [] }; groups.push(g) }
     g.items.push(m)
   })
+
+  function copyCode() {
+    navigator.clipboard?.writeText(provider.accessCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6" onClick={onClose}>
@@ -30,6 +38,14 @@ function ProviderDetail({ provider, missions, onClose }) {
           <div className="flex items-center gap-1.5 text-xs text-gray-500"><Phone size={12} /> {provider.phone}</div>
           <div className="flex items-center gap-1.5 text-xs text-gray-500"><Mail size={12} /> {provider.email}</div>
         </div>
+        <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0 bg-navy-50">
+          <p className="text-[10px] text-navy-600 uppercase tracking-wide font-medium mb-1">Code d'accès à transmettre au prestataire</p>
+          <div className="flex items-center gap-2">
+            <code className="text-sm font-bold text-navy-800 bg-white border border-navy-100 rounded-lg px-3 py-1.5 flex-1">{provider.accessCode}</code>
+            <button className="btn-ghost text-xs" onClick={copyCode}><Copy size={12} /> {copied ? 'Copié !' : 'Copier'}</button>
+          </div>
+          <p className="text-[10px] text-navy-500 mt-1.5">Avec ce code, le prestataire accède à son propre planning depuis /login → Ménage.</p>
+        </div>
         <div className="flex-1 overflow-auto p-4">
           {missions.length === 0 ? (
             <div className="bg-gray-50 rounded-xl p-6 text-center"><p className="text-sm text-gray-400">Aucun ménage assigné pour le moment.</p></div>
@@ -44,17 +60,21 @@ function ProviderDetail({ provider, missions, onClose }) {
                     {g.items.map(m => (
                       <div
                         key={m.key}
-                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${m.done ? 'bg-teal-50 border-teal-100' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`}
-                        onClick={() => toggleMenageDone(m.key)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${m.done ? 'bg-teal-50 border-teal-100' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`}
                       >
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 ${m.done ? 'bg-teal-400' : 'border-2 border-gray-300 bg-white'}`}>
+                        <div
+                          className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer ${m.done ? 'bg-teal-400' : 'border-2 border-gray-300 bg-white'}`}
+                          onClick={() => toggleMenageDone(m.key)}
+                        >
                           {m.done && <Check size={12} className="text-white" />}
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleMenageDone(m.key)}>
                           <p className={`text-sm font-medium ${m.done ? 'text-teal-800 line-through opacity-70' : 'text-gray-800'}`}>{m.boat}</p>
                           <p className="text-xs text-gray-400">{m.client} · {format(parseISO(m.date), 'EEE d MMM', { locale: fr })} · {m.heure}</p>
                         </div>
-                        {!m.done && <span className="text-[10px] text-gray-400 flex-shrink-0">Marquer fait →</span>}
+                        <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1" onClick={() => setInvoiceMission(m)}>
+                          <Receipt size={10} /> Facture
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -64,6 +84,10 @@ function ProviderDetail({ provider, missions, onClose }) {
           )}
         </div>
       </div>
+
+      {invoiceMission && (
+        <MenageInvoiceModal mission={invoiceMission} editable onClose={() => setInvoiceMission(null)} />
+      )}
     </div>
   )
 }
@@ -88,7 +112,7 @@ export default function Menage() {
       <div className="flex-1 overflow-auto p-5">
         <div className="mb-4 rounded-xl border border-navy-100 bg-navy-50 p-3 flex items-center gap-2.5">
           <Building2 size={14} className="text-navy-600 flex-shrink-0" />
-          <p className="text-xs text-navy-700">Le ménage est géré par des sociétés externes, pas par des salariés de l'agence — l'avancement est confirmé manuellement une fois le nettoyage vérifié.</p>
+          <p className="text-xs text-navy-700">Le ménage est géré par des sociétés externes avec leur propre accès (code dédié) — en temps réel avec ce que tu vois ici.</p>
         </div>
 
         <Card className="divide-y divide-gray-50">

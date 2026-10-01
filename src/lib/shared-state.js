@@ -18,8 +18,14 @@ let state = {
   // menageDone : missionKey -> bool. Le prestataire de ménage étant une société tierce (pas connectée
   // à Helmo), l'agence coche elle-même quand le nettoyage est confirmé fait.
   menageDone: {},
+  // menageInvoices : missionKey -> { content, status: 'generee' | 'payee', paidAt }
+  // Facture automatique entre l'agence et le prestataire de ménage, visible des deux côtés.
+  menageInvoices: {},
   // contracts : voir les fonctions getContract/setContractTemplate/updateContractContent/sendContract plus bas
   contracts: {},
+  // invoices : bookingId -> { content, status: 'brouillon' | 'envoyee' | 'payee', sentAt, paidAt }
+  // Sert au suivi de l'activité et des paiements — voir les fonctions plus bas.
+  invoices: {},
   checkIns: {}, // bookingId -> { done: bool, signature: bool, remarks: string, missing: {} }
   // checkInProgress : état du check-in EN COURS (avant signature), pour qu'un technicien
   // qui ferme la fenêtre sans avoir terminé retrouve tout tel quel en revenant.
@@ -197,6 +203,54 @@ export function markContractSigned(bookingId) {
   const current = state.contracts[bookingId]
   if (!current) return
   state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, status: 'signe', signedAt: '2026-07-04' } } }
+  listeners.forEach(fn => fn(state))
+}
+
+// ── Factures ──────────────────────────────────────────────────────
+export function getInvoice(bookingId, defaultContent) {
+  if (!state.invoices[bookingId]) {
+    state.invoices[bookingId] = { content: defaultContent, status: 'brouillon', sentAt: null, paidAt: null }
+  }
+  return state.invoices[bookingId]
+}
+
+export function updateInvoiceContent(bookingId, content) {
+  const current = state.invoices[bookingId] || { status: 'brouillon', sentAt: null, paidAt: null }
+  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, content } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function sendInvoice(bookingId) {
+  const current = state.invoices[bookingId]
+  if (!current) return
+  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, status: 'envoyee', sentAt: '2026-07-04' } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function markInvoicePaid(bookingId) {
+  const current = state.invoices[bookingId]
+  if (!current) return
+  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, status: 'payee', paidAt: '2026-07-04' } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function getMenageInvoice(missionKey, defaultContent) {
+  if (!state.menageInvoices[missionKey]) {
+    state.menageInvoices[missionKey] = { content: defaultContent, status: 'generee', paidAt: null }
+  }
+  return state.menageInvoices[missionKey]
+}
+
+export function updateMenageInvoiceContent(missionKey, content) {
+  const current = state.menageInvoices[missionKey] || { status: 'generee', paidAt: null }
+  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, content } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function markMenageInvoicePaid(missionKey) {
+  const current = state.menageInvoices[missionKey]
+  if (!current) return
+  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, status: 'payee', paidAt: '2026-07-04' } } }
   listeners.forEach(fn => fn(state))
 }
 

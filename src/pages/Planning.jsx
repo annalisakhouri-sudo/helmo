@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check, Sparkles } from 'lucide-react'
 import { addDays, addMonths, format, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, getDay, endOfWeek } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from '@/lib/mock-data'
 import BookingDetail from '@/components/planning/BookingDetail'
 import NewBookingModal from '@/components/planning/NewBookingModal'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
-import { getMaintenanceTasks, subscribe } from '@/lib/shared-state'
+import { getMaintenanceTasks, subscribe, getState } from '@/lib/shared-state'
 
 // Calcule le samedi de la semaine courante (ou égal si déjà samedi). Fiable, sans dépendance externe.
 function getSaturdayOnOrBefore(date) {
@@ -157,6 +157,14 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap }) {
                       {(b.skipperName || b.skipperId) && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#185FA5', color: '#E6F1FB', fontWeight: 500, whiteSpace: 'nowrap' }}>{(b.skipperName || 'Skipper').split(' ')[0]}</span>}
                       {b.status === 'skipper-missing' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FAEEDA', color: '#633806', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Skipper</span>}
                       {b.status === 'doc-issue' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FCEBEB', color: '#791F1F', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Doc</span>}
+                      {b.options?.menage && (() => {
+                        const done = !!getState().menageDone[`menage-${b.id}`]
+                        return (
+                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: done ? '#E1F5EE' : '#FFF4D6', color: done ? '#085041' : '#854F0B', fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                            <Sparkles size={9} /> {done ? 'Ménage ✓' : 'Ménage'}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
                 )

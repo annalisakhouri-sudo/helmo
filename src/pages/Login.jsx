@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, Anchor, Wrench, Waves } from 'lucide-react'
+import { Building2, Anchor, Wrench, Waves, Sparkles } from 'lucide-react'
 
 const ROLES = [
   {
@@ -28,6 +28,15 @@ const ROLES = [
     color: '#B36A0A',
     bg: 'rgba(179,106,10,0.08)',
     border: 'rgba(179,106,10,0.15)',
+  },
+  {
+    id: 'menage',
+    label: 'Ménage',
+    sub: 'Planning des nettoyages, société sous-traitante',
+    icon: Sparkles,
+    color: '#0F7D57',
+    bg: 'rgba(15,125,87,0.08)',
+    border: 'rgba(15,125,87,0.15)',
   },
 ]
 

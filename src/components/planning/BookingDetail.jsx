@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import React from 'react'
-import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck, CircleCheck, Tag, AlertTriangle } from 'lucide-react'
+import { X, FileText, Shield, Anchor, Users, Shirt, Phone, User, ClipboardCheck, CircleCheck, Tag, AlertTriangle, Euro } from 'lucide-react'
 import { TECHNICIANS, BOATS, OPTIONS_CATALOG } from '@/lib/mock-data'
 import { Card, SectionLabel, ProgressBar } from '@/components/ui'
 import CheckIn from './CheckIn'
 import ContractModal from './ContractModal'
+import InvoiceModal from './InvoiceModal'
 import { getState, subscribe, completeCheckIn, getMaintenanceTasks } from '@/lib/shared-state'
 import { buildChecklist } from './MaintenanceModal'
 
@@ -16,6 +17,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
   const techs = TECHNICIANS.filter(t => t.assignedBoats.includes(booking.boatId))
   const [showCheckIn, setShowCheckIn] = useState(false)
   const [showContract, setShowContract] = useState(false)
+  const [showInvoice, setShowInvoice] = useState(false)
   const [sharedState, setSharedState] = useState(getState())
   const [, forceUpdate] = useState(0) // force le re-render local après mutation directe de booking
   
@@ -189,6 +191,34 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                 })()}
               </div>
 
+              {/* Facture */}
+              <div>
+                <SectionLabel>Facture</SectionLabel>
+                {(() => {
+                  const invoiceState = sharedState.invoices[booking.id]
+                  const status = invoiceState?.status || 'brouillon'
+                  const style = status === 'payee' ? 'bg-teal-50 border-teal-100 hover:bg-teal-100'
+                    : status === 'envoyee' ? 'bg-amber-50 border-amber-100 hover:bg-amber-100'
+                    : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
+                  const iconColor = status === 'payee' ? 'text-teal-600' : status === 'envoyee' ? 'text-amber-600' : 'text-gray-400'
+                  const titleColor = status === 'payee' ? 'text-teal-800' : status === 'envoyee' ? 'text-amber-800' : 'text-gray-700'
+                  const subColor = status === 'payee' ? 'text-teal-600' : status === 'envoyee' ? 'text-amber-700' : 'text-gray-400'
+                  const title = status === 'payee' ? 'Facture payée' : status === 'envoyee' ? 'Facture envoyée — en attente' : 'Facture en brouillon'
+                  const subtitle = status === 'payee' ? `Réglée le ${invoiceState.paidAt}`
+                    : status === 'envoyee' ? `Envoyée le ${invoiceState.sentAt}`
+                    : 'Cliquer pour voir, modifier et envoyer'
+                  return (
+                    <div className={`flex items-center gap-2.5 rounded-xl p-3 border cursor-pointer transition-colors ${style}`} onClick={() => setShowInvoice(true)}>
+                      <Euro size={18} className={`${iconColor} flex-shrink-0`} />
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${titleColor}`}>{title}</p>
+                        <p className={`text-xs ${subColor}`}>{subtitle}</p>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
               {/* Check-in (toujours visible, quel que soit le contexte) */}
               <div>
                 <SectionLabel>Check-in {context === 'retour' && '(départ)'}</SectionLabel>
@@ -317,6 +347,10 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
 
       {showContract && (
         <ContractModal booking={booking} onClose={() => setShowContract(false)} />
+      )}
+
+      {showInvoice && (
+        <InvoiceModal booking={booking} onClose={() => setShowInvoice(false)} />
       )}
     </>
   )
