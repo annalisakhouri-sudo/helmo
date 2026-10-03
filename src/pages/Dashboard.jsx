@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { AlertTriangle, Plus, ChevronRight, ArrowUpRight, ArrowDownLeft, Euro } from 'lucide-react'
+import { AlertTriangle, Plus, ChevronRight, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { parseISO, addDays, format, isWithinInterval } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BOATS, BOOKINGS, DOC_LABELS, CLIENTS } from '@/lib/mock-data'
 import WeekendRotation from '@/components/dashboard/WeekendRotation'
 import BookingDetail from '@/components/planning/BookingDetail'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
-import { getState, subscribe } from '@/lib/shared-state'
 
 // Calcule le samedi de la semaine courante (ou égal si déjà samedi). Fiable, sans dépendance externe.
 function getSaturdayOnOrBefore(date) {
@@ -125,19 +124,12 @@ export default function Dashboard() {
   const { activeBrand, brand } = useOutletContext()
   const [listModal, setListModal] = useState(null) // 'departs' | 'retours' | null
   const [selectedBooking, setSelectedBooking] = useState(null)
-  const [sharedState, setSharedState] = useState(getState())
-  useEffect(() => subscribe(s => setSharedState(s)), [])
   const [selectedContext, setSelectedContext] = useState('depart')
   const [gapInfo, setGapInfo] = useState(null) // { boat, booking, nextBooking } → fiche maintenance
   const [, forceDashboardUpdate] = useState(0) // force le recalcul des alertes après mutation d'un booking
 
   const boats = BOATS.filter(b => b.brand === activeBrand)
   const bookings = BOOKINGS.filter(b => b.brand === activeBrand)
-
-  // Suivi de l'activité et des paiements : factures envoyées mais pas encore réglées.
-  const pendingInvoices = bookings
-    .map(b => ({ booking: b, invoice: sharedState.invoices[b.id] }))
-    .filter(({ invoice }) => invoice?.status === 'envoyee')
 
   // Deux semaines de pilotage : celle en cours, et la suivante
   const currentWeekStart = getSaturdayOnOrBefore(TODAY)
@@ -254,29 +246,6 @@ export default function Dashboard() {
                     <p className="text-xs text-amber-700">{b.issues.map(i => i.msg).join(' · ')}</p>
                   </div>
                   <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Voir →</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Suivi des paiements : factures envoyées, en attente de règlement */}
-        {pendingInvoices.length > 0 && (
-          <div className="mb-6">
-            <p className="section-label">Paiements en attente</p>
-            <div className="flex flex-col gap-2">
-              {pendingInvoices.map(({ booking: b, invoice }) => (
-                <div
-                  key={b.id}
-                  className="flex items-center gap-3 rounded-xl p-3 border bg-navy-50 border-navy-100 cursor-pointer hover:bg-navy-100 transition-colors"
-                  onClick={() => { setSelectedBooking(b); setSelectedContext('depart') }}
-                >
-                  <Euro size={14} className="text-navy-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate text-navy-800">{b.boatName} — {b.client}</p>
-                    <p className="text-xs text-navy-700">Facture envoyée le {invoice.sentAt} · pas encore réglée</p>
-                  </div>
-                  <span className="text-[10px] text-navy-600 font-medium whitespace-nowrap">Voir →</span>
                 </div>
               ))}
             </div>

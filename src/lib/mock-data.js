@@ -360,7 +360,7 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { sup: { qty: 2 }, carbu: true, menage: true },
+    options: { sup: { qty: 2 }, carbu: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -371,7 +371,7 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { masque: { qty: 3 , menage: true} },
+    options: { masque: { qty: 3 } },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -393,7 +393,7 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { taud: true, sup: { qty: 1 }, menage: true },
+    options: { taud: true, sup: { qty: 1 } },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -415,7 +415,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -436,7 +435,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -457,7 +455,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -478,7 +475,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -499,7 +495,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -520,7 +515,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -541,7 +535,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -562,7 +555,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -583,7 +575,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'skipper-missing', color: 'amber',
     lastNightAboard: true,
   },
@@ -604,7 +595,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -625,7 +615,6 @@ export const BOOKINGS = [
     skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
     needsSkipper: true,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -646,7 +635,6 @@ export const BOOKINGS = [
     skipperId: 'skip-2', skipperName: 'Sophie Bernard', skipperInitials: 'SB',
     needsSkipper: true,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -667,7 +655,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -688,7 +675,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -709,7 +695,6 @@ export const BOOKINGS = [
     skipperId: 'skip-2', skipperName: 'Sophie Bernard', skipperInitials: 'SB',
     needsSkipper: true,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -730,7 +715,6 @@ export const BOOKINGS = [
     skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -751,7 +735,6 @@ export const BOOKINGS = [
     skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -772,7 +755,6 @@ export const BOOKINGS = [
     skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -793,7 +775,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -814,7 +795,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -835,7 +815,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -856,7 +835,6 @@ export const BOOKINGS = [
     skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
     needsSkipper: true,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -877,7 +855,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -898,7 +875,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -919,7 +895,6 @@ export const BOOKINGS = [
     skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -940,7 +915,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -961,7 +935,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -982,7 +955,6 @@ export const BOOKINGS = [
     skipperId: 'skip-2', skipperName: 'Sophie Bernard', skipperInitials: 'SB',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -1003,7 +975,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -1024,7 +995,6 @@ export const BOOKINGS = [
     skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1045,7 +1015,6 @@ export const BOOKINGS = [
     skipperId: 'skip-2', skipperName: 'Sophie Bernard', skipperInitials: 'SB',
     needsSkipper: true,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: true,
   },
@@ -1066,7 +1035,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1087,7 +1055,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1108,7 +1075,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1129,7 +1095,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1150,7 +1115,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1171,7 +1135,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1192,7 +1155,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1213,7 +1175,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1234,7 +1195,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1255,7 +1215,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1276,7 +1235,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1297,7 +1255,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1318,7 +1275,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1339,7 +1295,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1360,7 +1315,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1381,7 +1335,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1402,7 +1355,6 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: false,
     draps: [],
-    options: { menage: true },
     status: 'confirmed', color: 'teal',
     lastNightAboard: false,
   },
@@ -1451,12 +1403,12 @@ export const TECHNICIANS = [
 export const MENAGE_PROVIDERS = [
   {
     id: 'menage-1', company: 'Nickel Nautique', contact: 'Sophie Durand', phone: '06 70 12 34 56', email: 'contact@nickelnautique.fr',
-    isExternal: true, accessCode: 'NICKEL-2026',
+    isExternal: true,
     assignedBoats: ['mn-1', 'mn-2', 'mn-3', 'mn-4', 'mn-9', 'mn-11'],
   },
   {
     id: 'menage-2', company: 'Calanques Propreté', contact: 'Yassine Belkacem', phone: '06 44 98 76 54', email: 'contact@calanquesproprete.fr',
-    isExternal: true, accessCode: 'CALANQUES-2026',
+    isExternal: true,
     assignedBoats: ['mn-5', 'mn-6', 'mn-7', 'mn-8', 'mn-10', 'lm-1', 'lm-2', 'lm-3'],
   },
 ]
@@ -1486,51 +1438,6 @@ export const BOAT_PRICES = {
   'lm-2':  { 'period-1': 1100, 'period-2': 1450, 'period-3': 2000, 'period-4': 1450, 'period-5': 1100 },
   'lm-3':  { 'period-1': 1200, 'period-2': 1600, 'period-3': 2200, 'period-4': 1600, 'period-5': 1200 },
 }
-
-// Facture entre l'agence et le prestataire de ménage (paiement du service rendu),
-// distincte de la facture envoyée au client final de la location.
-export const MENAGE_INVOICE_TEMPLATE = `FACTURE PRESTATION MÉNAGE N° {{invoice_number}}
-Date d'émission : {{today}}
-
-Émise par : {{provider_company}}
-Contact : {{provider_contact}} — {{provider_phone}} — {{provider_email}}
-
-Facturé à :
-{{agency_name}}
-{{agency_port}}
-
-DÉTAIL
-Nettoyage — {{boat_name}}                                 {{price}}
-Date de la prestation : {{mission_date}}
-
-TOTAL TTC : {{price}}
-
-Statut : {{payment_status}}`
-
-export const INVOICE_TEMPLATE = `FACTURE N° {{invoice_number}}
-Date d'émission : {{today}}
-
-{{company_name}}
-{{company_port}}
-{{company_email}} — {{company_phone}}
-
-Facturé à :
-{{client_prenom}} {{client_nom}}
-{{client_email}}
-{{client_tel}}
-
-Location : {{boat_name}}
-Période : du {{start_date}} au {{end_date}}
-
-DÉTAIL
-{{line_items}}
-
-TOTAL TTC : {{total_price}}
-
-Mode de paiement : {{payment_mode}}
-Statut : {{payment_status}}
-
-Merci de votre confiance.`
 
 export const CONTRACT_TEMPLATES = [
   {
@@ -1624,7 +1531,7 @@ export const OPTIONS_CATALOG = [
   { id: 'masque', label: 'Masque & tuba', icon: 'Glasses', hasSub: true, price: 8, unit: '/ jeu', active: true, description: 'Équipement snorkeling par personne' },
   { id: 'franchise', label: 'Franchise réduite', icon: 'ShieldCheck', hasSub: true, price: 90, unit: 'forfait', active: true, description: 'Réduction de la franchise en cas de dommage' },
   { id: 'wifi', label: 'WiFi satellite', icon: 'Wifi', hasSub: false, price: 45, unit: '/ semaine', active: false, description: 'Connexion internet satellite à bord' },
-  { id: 'menage', label: 'Ménage fin de séjour', icon: 'SprayCan', hasSub: false, price: 70, unit: 'forfait', active: true, description: 'Nettoyage complet en fin de location par une société spécialisée' },
+  { id: 'menage', label: 'Ménage fin de séjour', icon: 'SprayCan', hasSub: false, price: 70, unit: 'forfait', active: false, description: 'Nettoyage complet en fin de location' },
 ]
 
 export const DOC_LABELS = {

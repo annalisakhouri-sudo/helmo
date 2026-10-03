@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check, Sparkles } from 'lucide-react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check } from 'lucide-react'
 import { addDays, addMonths, format, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, getDay, endOfWeek } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from '@/lib/mock-data'
 import BookingDetail from '@/components/planning/BookingDetail'
 import NewBookingModal from '@/components/planning/NewBookingModal'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
-import { getMaintenanceTasks, subscribe, getState } from '@/lib/shared-state'
+import { getMaintenanceTasks, subscribe } from '@/lib/shared-state'
 
 // Calcule le samedi de la semaine courante (ou égal si déjà samedi). Fiable, sans dépendance externe.
 function getSaturdayOnOrBefore(date) {
@@ -45,7 +45,7 @@ function bookingsForDay(day, bookings) {
 // - Si le bateau repart le samedi après-midi avec un nouveau client : bloc maintenance fixe 10h→15h
 //   (samedi, soit 0.42 → 0.625 de la case), ou dès la veille au soir si le départ précédent était
 //   un vendredi soir (alors le bloc maintenance s'étend de vendredi 0.75 jusqu'à samedi 0.625).
-function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId }) {
+function WeekView({ days, boats, bookings, onSelect, onSelectGap }) {
   const N = days.length // 8 (samedi → samedi inclus)
   const [, forceUpdate] = useState(0)
   useEffect(() => subscribe(() => forceUpdate(v => v + 1)), [])
@@ -151,20 +151,12 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
                 const c = getBookingColor(b)
                 const span = getSpanStyle(b)
                 return (
-                  <div key={b.id} className={`absolute top-2 bottom-2 rounded-lg px-2.5 py-1.5 cursor-pointer border ${c.bg} ${c.border} ${c.text} hover:opacity-85 transition-opacity overflow-hidden shadow-sm`} style={{ ...span, zIndex: highlightId === b.id ? 5 : 1, ...(highlightId === b.id ? { boxShadow: '0 0 0 3px #F59E0B, 0 0 18px 4px rgba(245,158,11,0.55)', transform: 'scale(1.03)' } : highlightId ? { opacity: 0.35 } : {}), transition: 'all 0.3s ease' }} onClick={() => onSelect(b)}>
+                  <div key={b.id} className={`absolute top-2 bottom-2 rounded-lg px-2.5 py-1.5 cursor-pointer border ${c.bg} ${c.border} ${c.text} hover:opacity-85 transition-opacity overflow-hidden shadow-sm`} style={{ ...span, zIndex: 1 }} onClick={() => onSelect(b)}>
                     <p className="text-xs font-semibold truncate">{b.client}</p>
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {(b.skipperName || b.skipperId) && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#185FA5', color: '#E6F1FB', fontWeight: 500, whiteSpace: 'nowrap' }}>{(b.skipperName || 'Skipper').split(' ')[0]}</span>}
                       {b.status === 'skipper-missing' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FAEEDA', color: '#633806', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Skipper</span>}
                       {b.status === 'doc-issue' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FCEBEB', color: '#791F1F', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Doc</span>}
-                      {b.options?.menage && (() => {
-                        const done = !!getState().menageDone[`menage-${b.id}`]
-                        return (
-                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: done ? '#E1F5EE' : '#FFF4D6', color: done ? '#085041' : '#854F0B', fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                            <Sparkles size={9} /> {done ? 'Ménage ✓' : 'Ménage'}
-                          </span>
-                        )
-                      })()}
                     </div>
                   </div>
                 )
@@ -330,26 +322,9 @@ export default function Planning() {
   const [showNew, setShowNew] = useState(false)
   const [extraBookings, setExtraBookings] = useState([])
   const [gapInfo, setGapInfo] = useState(null) // { boat, booking } — créneau technicien cliqué
-  const [highlightId, setHighlightId] = useState(null)
-  const [searchParams, setSearchParams] = useSearchParams()
 
   const filteredBoats = BOATS.filter(b => b.brand === activeBrand)
   const allBookings = [...BOOKINGS, ...extraBookings].filter(b => b.brand === activeBrand)
-
-  // Vient de la barre de recherche globale : saute sur la bonne semaine et surligne la loc.
-  useEffect(() => {
-    const id = searchParams.get('highlight')
-    if (!id) return
-    const target = allBookings.find(b => b.id === id)
-    if (target) {
-      setView('week')
-      setCurrentDate(getSaturdayOnOrBefore(parseISO(target.start)))
-      setHighlightId(id)
-      setTimeout(() => setHighlightId(null), 4000)
-    }
-    setSearchParams({}, { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   function navigate_date(dir) {
     if (view === 'week') setCurrentDate(d => addDays(d, dir * 7))
@@ -398,7 +373,7 @@ export default function Planning() {
           ))}
         </div>
 
-        {view === 'week' && <WeekView days={weekDays} boats={filteredBoats} bookings={allBookings} highlightId={highlightId} onSelect={setSelected} onSelectGap={(boat, booking) => setGapInfo({ boat, booking })} />}
+        {view === 'week' && <WeekView days={weekDays} boats={filteredBoats} bookings={allBookings} onSelect={setSelected} onSelectGap={(boat, booking) => setGapInfo({ boat, booking })} />}
         {view === 'month' && <MonthView date={currentDate} boats={filteredBoats} bookings={allBookings} onSelect={setSelected} />}
         {view === 'year' && <YearView year={currentDate.getFullYear()} boats={filteredBoats} bookings={allBookings} onSelect={setSelected} />}
 

@@ -18,17 +18,8 @@ let state = {
   // menageDone : missionKey -> bool. Le prestataire de ménage étant une société tierce (pas connectée
   // à Helmo), l'agence coche elle-même quand le nettoyage est confirmé fait.
   menageDone: {},
-  // menageInvoices : missionKey -> { content, status: 'generee' | 'payee', paidAt }
-  // Facture automatique entre l'agence et le prestataire de ménage, visible des deux côtés.
-  menageInvoices: {},
   // contracts : voir les fonctions getContract/setContractTemplate/updateContractContent/sendContract plus bas
   contracts: {},
-  // invoices : bookingId -> { data: {...lignes modifiables}, status: 'brouillon' | 'envoyee' | 'payee', sentAt, paidAt }
-  // Sert au suivi de l'activité et des paiements — voir les fonctions plus bas.
-  invoices: {},
-  // Réglage global appliqué à toutes les nouvelles factures (le vrai "modèle" éditable une
-  // seule fois plutôt que facture par facture).
-  invoiceSettings: { footerNote: 'Merci de votre confiance.' },
   checkIns: {}, // bookingId -> { done: bool, signature: bool, remarks: string, missing: {} }
   // checkInProgress : état du check-in EN COURS (avant signature), pour qu'un technicien
   // qui ferme la fenêtre sans avoir terminé retrouve tout tel quel en revenant.
@@ -206,74 +197,6 @@ export function markContractSigned(bookingId) {
   const current = state.contracts[bookingId]
   if (!current) return
   state = { ...state, contracts: { ...state.contracts, [bookingId]: { ...current, status: 'signe', signedAt: '2026-07-04' } } }
-  listeners.forEach(fn => fn(state))
-}
-
-// ── Factures ──────────────────────────────────────────────────────
-export function getInvoiceSettings() {
-  return state.invoiceSettings
-}
-
-export function updateInvoiceSettings(footerNote) {
-  state = { ...state, invoiceSettings: { ...state.invoiceSettings, footerNote } }
-  listeners.forEach(fn => fn(state))
-}
-
-export function getInvoice(bookingId, defaultData) {
-  if (!state.invoices[bookingId]) {
-    state.invoices[bookingId] = { data: { ...defaultData, notes: '' }, status: 'brouillon', sentAt: null, paidAt: null }
-  }
-  return state.invoices[bookingId]
-}
-
-export function updateInvoiceLineItem(bookingId, lineId, field, value) {
-  const current = state.invoices[bookingId]
-  if (!current) return
-  const lineItems = current.data.lineItems.map(li => li.id === lineId ? { ...li, [field]: value } : li)
-  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, data: { ...current.data, lineItems } } } }
-  listeners.forEach(fn => fn(state))
-}
-
-export function updateInvoiceNotes(bookingId, notes) {
-  const current = state.invoices[bookingId]
-  if (!current) return
-  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, data: { ...current.data, notes } } } }
-  listeners.forEach(fn => fn(state))
-}
-
-export function sendInvoice(bookingId) {
-  const current = state.invoices[bookingId]
-  if (!current) return
-  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, status: 'envoyee', sentAt: '2026-07-04' } } }
-  listeners.forEach(fn => fn(state))
-}
-
-export function markInvoicePaid(bookingId) {
-  const current = state.invoices[bookingId]
-  if (!current) return
-  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, status: 'payee', paidAt: '2026-07-04' } } }
-  listeners.forEach(fn => fn(state))
-}
-
-export function getMenageInvoice(missionKey, defaultData) {
-  if (!state.menageInvoices[missionKey]) {
-    state.menageInvoices[missionKey] = { data: { ...defaultData, notes: '' }, status: 'generee', paidAt: null }
-  }
-  return state.menageInvoices[missionKey]
-}
-
-export function updateMenageInvoiceLineItem(missionKey, lineId, field, value) {
-  const current = state.menageInvoices[missionKey]
-  if (!current) return
-  const lineItems = current.data.lineItems.map(li => li.id === lineId ? { ...li, [field]: value } : li)
-  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, data: { ...current.data, lineItems } } } }
-  listeners.forEach(fn => fn(state))
-}
-
-export function markMenageInvoicePaid(missionKey) {
-  const current = state.menageInvoices[missionKey]
-  if (!current) return
-  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, status: 'payee', paidAt: '2026-07-04' } } }
   listeners.forEach(fn => fn(state))
 }
 
