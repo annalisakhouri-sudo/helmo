@@ -99,6 +99,9 @@ export default function Menage() {
 
   const providers = MENAGE_PROVIDERS.map(p => ({ ...p, missions: getMissionsForProvider(p.id) }))
   const selectedProvider = providers.find(p => p.id === selected)
+  const allMissions = providers.flatMap(p => p.missions)
+  const totalDone = allMissions.filter(m => m.done).length
+  const pendingRevenue = allMissions.filter(m => !m.done).reduce((sum, m) => sum + m.price, 0)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -110,6 +113,21 @@ export default function Menage() {
       </div>
 
       <div className="flex-1 overflow-auto p-5">
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
+            <p className="font-display text-xl font-bold text-navy-900">{allMissions.length}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">missions au total</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
+            <p className="font-display text-xl font-bold text-teal-600">{totalDone}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">confirmées faites</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
+            <p className="font-display text-xl font-bold text-amber-600">{pendingRevenue}€</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">à régler (estimé)</p>
+          </div>
+        </div>
+
         <div className="mb-4 rounded-xl border border-navy-100 bg-navy-50 p-3 flex items-center gap-2.5">
           <Building2 size={14} className="text-navy-600 flex-shrink-0" />
           <p className="text-xs text-navy-700">Le ménage est géré par des sociétés externes avec leur propre accès (code dédié) — en temps réel avec ce que tu vois ici.</p>

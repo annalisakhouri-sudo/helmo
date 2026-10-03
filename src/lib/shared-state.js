@@ -23,9 +23,12 @@ let state = {
   menageInvoices: {},
   // contracts : voir les fonctions getContract/setContractTemplate/updateContractContent/sendContract plus bas
   contracts: {},
-  // invoices : bookingId -> { content, status: 'brouillon' | 'envoyee' | 'payee', sentAt, paidAt }
+  // invoices : bookingId -> { data: {...lignes modifiables}, status: 'brouillon' | 'envoyee' | 'payee', sentAt, paidAt }
   // Sert au suivi de l'activité et des paiements — voir les fonctions plus bas.
   invoices: {},
+  // Réglage global appliqué à toutes les nouvelles factures (le vrai "modèle" éditable une
+  // seule fois plutôt que facture par facture).
+  invoiceSettings: { footerNote: 'Merci de votre confiance.' },
   checkIns: {}, // bookingId -> { done: bool, signature: bool, remarks: string, missing: {} }
   // checkInProgress : état du check-in EN COURS (avant signature), pour qu'un technicien
   // qui ferme la fenêtre sans avoir terminé retrouve tout tel quel en revenant.
@@ -207,16 +210,34 @@ export function markContractSigned(bookingId) {
 }
 
 // ── Factures ──────────────────────────────────────────────────────
-export function getInvoice(bookingId, defaultContent) {
+export function getInvoiceSettings() {
+  return state.invoiceSettings
+}
+
+export function updateInvoiceSettings(footerNote) {
+  state = { ...state, invoiceSettings: { ...state.invoiceSettings, footerNote } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function getInvoice(bookingId, defaultData) {
   if (!state.invoices[bookingId]) {
-    state.invoices[bookingId] = { content: defaultContent, status: 'brouillon', sentAt: null, paidAt: null }
+    state.invoices[bookingId] = { data: { ...defaultData, notes: '' }, status: 'brouillon', sentAt: null, paidAt: null }
   }
   return state.invoices[bookingId]
 }
 
-export function updateInvoiceContent(bookingId, content) {
-  const current = state.invoices[bookingId] || { status: 'brouillon', sentAt: null, paidAt: null }
-  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, content } } }
+export function updateInvoiceLineItem(bookingId, lineId, field, value) {
+  const current = state.invoices[bookingId]
+  if (!current) return
+  const lineItems = current.data.lineItems.map(li => li.id === lineId ? { ...li, [field]: value } : li)
+  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, data: { ...current.data, lineItems } } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function updateInvoiceNotes(bookingId, notes) {
+  const current = state.invoices[bookingId]
+  if (!current) return
+  state = { ...state, invoices: { ...state.invoices, [bookingId]: { ...current, data: { ...current.data, notes } } } }
   listeners.forEach(fn => fn(state))
 }
 
@@ -234,16 +255,18 @@ export function markInvoicePaid(bookingId) {
   listeners.forEach(fn => fn(state))
 }
 
-export function getMenageInvoice(missionKey, defaultContent) {
+export function getMenageInvoice(missionKey, defaultData) {
   if (!state.menageInvoices[missionKey]) {
-    state.menageInvoices[missionKey] = { content: defaultContent, status: 'generee', paidAt: null }
+    state.menageInvoices[missionKey] = { data: { ...defaultData, notes: '' }, status: 'generee', paidAt: null }
   }
   return state.menageInvoices[missionKey]
 }
 
-export function updateMenageInvoiceContent(missionKey, content) {
-  const current = state.menageInvoices[missionKey] || { status: 'generee', paidAt: null }
-  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, content } } }
+export function updateMenageInvoiceLineItem(missionKey, lineId, field, value) {
+  const current = state.menageInvoices[missionKey]
+  if (!current) return
+  const lineItems = current.data.lineItems.map(li => li.id === lineId ? { ...li, [field]: value } : li)
+  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, data: { ...current.data, lineItems } } } }
   listeners.forEach(fn => fn(state))
 }
 

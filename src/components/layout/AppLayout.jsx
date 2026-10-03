@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { BRANDS } from '@/lib/mock-data'
+import GlobalSearch from './GlobalSearch'
 
 const NAV = [
   {
@@ -121,6 +122,7 @@ export default function AppLayout({ user, onLogout }) {
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden">
+        <GlobalSearch />
         <Outlet context={{ activeBrand, brand }} />
       </main>
     </div>

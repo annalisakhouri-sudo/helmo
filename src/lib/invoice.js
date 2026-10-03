@@ -1,5 +1,5 @@
-import { format, differenceInCalendarDays } from 'date-fns'
-import { BRANDS, CLIENTS, BOATS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, INVOICE_TEMPLATE } from './mock-data'
+import { format } from 'date-fns'
+import { BRANDS, CLIENTS, BOATS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES } from './mock-data'
 
 const TODAY = new Date('2026-07-04')
 
@@ -9,10 +9,12 @@ function computeBasePrice(boatId, startDate) {
 }
 
 export function buildInvoiceNumber(booking) {
-  return `HLM-${booking.start.replace(/-/g, '')}-${booking.id.slice(-4).toUpperCase()}`
+  return `HLM-${booking.start.replace(/-/g, '')}-${booking.id.replace(/^bk-/, '').padStart(3, '0').toUpperCase()}`
 }
 
-export function buildInvoiceContent(booking) {
+// Retourne des données STRUCTURÉES (pas un bloc de texte) pour un vrai rendu visuel,
+// et pour pouvoir éditer chaque ligne individuellement.
+export function buildInvoiceData(booking) {
   const boat = BOATS.find(b => b.id === booking.boatId)
   const brand = BRANDS[booking.brand]
   const client = CLIENTS.find(c => c.id === booking.clientId) || CLIENTS.find(c => c.locations?.includes(booking.id))
@@ -21,49 +23,47 @@ export function buildInvoiceContent(booking) {
   const fallbackNom = fullName.length > 1 ? fullName[fullName.length - 1] : ''
 
   const basePrice = computeBasePrice(booking.boatId, booking.start)
-  const lines = []
-  let total = 0
+  const lineItems = []
 
-  if (basePrice) {
-    lines.push(`Location ${boat?.name || booking.boatName} (semaine)`.padEnd(45) + `${basePrice} €`)
-    total += basePrice
-  } else {
-    lines.push(`Location ${boat?.name || booking.boatName} — prix à confirmer avec l'agence`)
-  }
+  lineItems.push({
+    id: 'base',
+    label: `Location ${boat?.name || booking.boatName} (semaine)`,
+    amount: basePrice ?? 0,
+    editable: true,
+  })
 
   Object.entries(booking.options || {}).forEach(([optId, val]) => {
     if (!val) return
     const opt = OPTIONS_CATALOG.find(o => o.id === optId)
     if (!opt) return
     const qty = typeof val === 'object' ? (val.qty || 1) : 1
-    const lineTotal = opt.price * qty
-    lines.push(`${opt.label}${qty > 1 ? ` × ${qty}` : ''}`.padEnd(45) + `${lineTotal} €`)
-    total += lineTotal
+    lineItems.push({
+      id: optId,
+      label: qty > 1 ? `${opt.label} × ${qty}` : opt.label,
+      amount: opt.price * qty,
+      editable: true,
+    })
   })
 
-  const tokens = {
-    invoice_number: buildInvoiceNumber(booking),
-    today: format(TODAY, 'dd/MM/yyyy'),
-    company_name: brand?.name || '',
-    company_port: brand?.port || '',
-    company_email: brand?.email || '',
-    company_phone: brand?.phone || '',
-    client_prenom: client?.prenom || fallbackPrenom,
-    client_nom: client?.nom || fallbackNom,
-    client_email: client?.email || 'Non renseigné',
-    client_tel: client?.tel || booking.phone || '',
-    boat_name: boat?.name || booking.boatName,
-    start_date: booking.start,
-    end_date: booking.end,
-    line_items: lines.join('\n'),
-    total_price: basePrice ? `${total} €` : 'À confirmer',
-    payment_mode: 'Non renseigné',
-    payment_status: 'En attente',
+  return {
+    invoiceNumber: buildInvoiceNumber(booking),
+    date: format(TODAY, 'dd/MM/yyyy'),
+    company: {
+      name: brand?.name || '',
+      port: brand?.port || '',
+      email: brand?.email || '',
+      phone: brand?.phone || '',
+    },
+    client: {
+      name: client ? `${client.prenom} ${client.nom}` : `${fallbackPrenom} ${fallbackNom}`.trim(),
+      email: client?.email || 'Non renseigné',
+      tel: client?.tel || booking.phone || '',
+    },
+    boatName: boat?.name || booking.boatName,
+    startDate: booking.start,
+    endDate: booking.end,
+    lineItems,
+    paymentMode: 'Non renseigné',
+    priceUnknown: !basePrice,
   }
-
-  let content = INVOICE_TEMPLATE
-  Object.entries(tokens).forEach(([key, val]) => {
-    content = content.split(`{{${key}}}`).join(val ?? '')
-  })
-  return content
 }

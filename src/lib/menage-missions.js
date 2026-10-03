@@ -94,8 +94,9 @@ export function buildPeriodSummary(missions, periodType = 'week') {
   const groups = {}
   missions.forEach(m => {
     const key = periodType === 'month' ? m.date.slice(0, 7) : m.weekStart
-    if (!groups[key]) groups[key] = { key, missions: [], total: 0, doneCount: 0 }
+    if (!groups[key]) groups[key] = { key, missions: [], total: 0, planned: 0, doneCount: 0 }
     groups[key].missions.push(m)
+    groups[key].planned += m.price
     if (m.done) { groups[key].total += m.price; groups[key].doneCount += 1 }
   })
   return Object.values(groups).sort((a, b) => a.key.localeCompare(b.key))

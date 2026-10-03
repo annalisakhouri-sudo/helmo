@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, X, Check, Pencil, Trash2, Power, Calendar } from 'lucide-react'
 import { OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, BOATS } from '@/lib/mock-data'
-import { SectionLabel } from '@/components/ui'
+import { SectionLabel, Card } from '@/components/ui'
+import { getInvoiceSettings, updateInvoiceSettings } from '@/lib/shared-state'
 import OptionIcon, { ICON_NAMES } from '@/components/ui/OptionIcon'
 
 const UNITS = ['/ jour', '/ semaine', '/ jeu', '/ personne', 'forfait']
@@ -456,6 +457,40 @@ function PricingTab({ activeBrand }) {
 // PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
 
+function FacturationTab() {
+  const [footerNote, setFooterNote] = useState(getInvoiceSettings().footerNote)
+  const [saved, setSaved] = useState(false)
+
+  function save() {
+    updateInvoiceSettings(footerNote)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
+
+  return (
+    <div className="max-w-xl">
+      <SectionLabel>Modèle de facture</SectionLabel>
+      <Card>
+        <p className="text-xs text-gray-500 mb-3">
+          Ce message apparaît en bas de toutes les factures (client et ménage), en PDF comme à l'écran.
+          Les lignes de facturation elles-mêmes (prix du bateau, options) restent modifiables location par location,
+          directement dans chaque facture.
+        </p>
+        <p className="text-xs font-medium text-gray-600 mb-1.5">Message de fin de facture</p>
+        <textarea
+          className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-navy-600"
+          rows={2}
+          value={footerNote}
+          onChange={e => setFooterNote(e.target.value)}
+        />
+        <button className="btn-primary mt-3" onClick={save}>
+          <Check size={14} /> {saved ? 'Enregistré !' : 'Enregistrer'}
+        </button>
+      </Card>
+    </div>
+  )
+}
+
 export default function Options() {
   const [tab, setTab] = useState('options')
   const { activeBrand } = useOutletContext() || { activeBrand: 'midi-nautisme' }
@@ -468,7 +503,7 @@ export default function Options() {
           <p className="text-xs text-gray-400">Catalogue d'options et grille tarifaire de la flotte</p>
         </div>
         <div className="flex border border-gray-200 rounded-xl overflow-hidden">
-          {[{ id: 'options', label: 'Options' }, { id: 'pricing', label: 'Tarifs bateaux' }].map(t => (
+          {[{ id: 'options', label: 'Options' }, { id: 'pricing', label: 'Tarifs bateaux' }, { id: 'facturation', label: 'Facturation' }].map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -482,7 +517,7 @@ export default function Options() {
       </div>
 
       <div className="flex-1 overflow-auto p-5">
-        {tab === 'options' ? <OptionsTab /> : <PricingTab activeBrand={activeBrand} />}
+        {tab === 'options' ? <OptionsTab /> : tab === 'pricing' ? <PricingTab activeBrand={activeBrand} /> : <FacturationTab />}
       </div>
     </div>
   )

@@ -150,6 +150,23 @@ export default function MenageDashboard({ onLogout }) {
           </div>
         </div>
 
+        {view === 'planning' && missions.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 px-6 pt-5 max-w-2xl print:hidden">
+            <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
+              <p className="font-display text-xl font-bold text-navy-900">{missions.length}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">missions au total</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
+              <p className="font-display text-xl font-bold text-teal-600">{done}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">confirmées faites</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
+              <p className="font-display text-xl font-bold text-amber-600">{missions.length - done}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">restant à faire</p>
+            </div>
+          </div>
+        )}
+
         <div className="p-6 max-w-2xl">
           {view === 'planning' ? (
             missions.length === 0 ? (
@@ -196,9 +213,12 @@ export default function MenageDashboard({ onLogout }) {
                         ? format(parseISO(`${period.key}-01`), 'MMMM yyyy', { locale: fr })
                         : `Semaine du ${format(parseISO(period.key), 'd MMMM', { locale: fr })}`}
                     </p>
-                    <p className="text-sm font-bold text-teal-700">{period.total}€</p>
+                    <p className="text-sm font-bold text-navy-900">{period.planned}€ <span className="text-[10px] font-normal text-gray-400">prévus</span></p>
                   </div>
-                  <p className="text-xs text-gray-400">{period.doneCount} ménage{period.doneCount > 1 ? 's' : ''} confirmé{period.doneCount > 1 ? 's' : ''} sur {period.missions.length}</p>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+                    <div className="h-1.5 rounded-full bg-teal-400" style={{ width: `${period.planned ? Math.round((period.total / period.planned) * 100) : 0}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-400">{period.doneCount} ménage{period.doneCount > 1 ? 's' : ''} confirmé{period.doneCount > 1 ? 's' : ''} sur {period.missions.length} · <span className="text-teal-700 font-medium">{period.total}€ confirmés</span></p>
                 </div>
               ))}
             </div>
