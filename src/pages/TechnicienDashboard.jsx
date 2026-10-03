@@ -623,7 +623,7 @@ export default function TechnicienDashboard({ onLogout }) {
     const mission = missions.find(m=>m.id===selectedMission)
     const tasks = sharedState.techTasks[tech.id]?.[mission.id] || []
     return (
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
         <TechSidebar tech={tech} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
         <main className="flex-1 flex flex-col overflow-hidden">
           <TechMission tech={tech} mission={mission} tasks={tasks} sharedState={sharedState}
@@ -636,7 +636,7 @@ export default function TechnicienDashboard({ onLogout }) {
   // Vue planning technicien
   if(selectedTech && tech && activeView==='planning') {
     return (
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
         <TechSidebar tech={tech} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
         <main className="flex-1 flex flex-col overflow-hidden">
           <TechPlanning tech={tech} missions={missions} sharedState={sharedState} onSelectMission={setSelectedMission}/>
@@ -648,7 +648,7 @@ export default function TechnicienDashboard({ onLogout }) {
   // Vue équipe ou missions du technicien sélectionné
   if(selectedTech && tech) {
     return (
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
         <TechSidebar tech={tech} onLogout={onLogout} activeView={activeView} setView={v=>{setActiveView(v)}}/>
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="topbar">
@@ -695,7 +695,7 @@ export default function TechnicienDashboard({ onLogout }) {
 
   // Vue liste équipe
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
       <TechSidebar tech={TECH_META[0]} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="topbar"><div><h1 className="font-display text-base font-bold">Équipe</h1><p className="text-xs text-gray-400">{TECH_META.length} techniciens</p></div></div>

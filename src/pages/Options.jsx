@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, X, Check, Pencil, Trash2, Power, Calendar } from 'lucide-react'
-import { OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, BOATS } from '@/lib/mock-data'
-import { SectionLabel } from '@/components/ui'
+import { Plus, X, Check, Pencil, Trash2, Power, Calendar, RotateCcw } from 'lucide-react'
+import { OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, BOATS, BOOKINGS } from '@/lib/mock-data'
+import { SectionLabel, Card } from '@/components/ui'
+import { getInvoiceTemplate, updateInvoiceTemplate, resetInvoiceTemplate, subscribe } from '@/lib/shared-state'
+import { INVOICE_TYPES, ACCENT_COLORS } from '@/lib/invoice-templates'
+import { buildInvoiceData } from '@/lib/invoice'
+import { buildMenageInvoiceData } from '@/lib/menage-invoice'
+import { buildAllMenageMissions } from '@/lib/menage-missions'
+import InvoiceSheet from '@/components/planning/InvoiceSheet'
 import OptionIcon, { ICON_NAMES } from '@/components/ui/OptionIcon'
 
 const UNITS = ['/ jour', '/ semaine', '/ jeu', '/ personne', 'forfait']
@@ -456,6 +462,145 @@ function PricingTab({ activeBrand }) {
 // PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
 
+// Exemple affiché dans l'aperçu : une vraie location / une vraie mission de la démo.
+function sampleSheet(type, tpl) {
+  if (type === 'menage') {
+    const mission = buildAllMenageMissions()[0]
+    const d = buildMenageInvoiceData(mission)
+    return {
+      tpl, invoiceNumber: d.invoiceNumber, date: d.date,
+      from: { name: d.provider.company, lines: [d.provider.contact, d.provider.phone, d.provider.email] },
+      to: { name: d.agency.name, lines: [d.agency.port] },
+      subtitleLine: `${mission.boat} — prestation du ${d.missionDate}`,
+      lineItems: d.lineItems, total: d.lineItems.reduce((s, l) => s + l.amount, 0),
+    }
+  }
+  const d = buildInvoiceData(BOOKINGS[0])
+  return {
+    tpl, invoiceNumber: d.invoiceNumber, date: d.date,
+    from: { name: d.company.name, lines: [d.company.port, d.company.email, d.company.phone] },
+    to: { name: d.client.name, lines: [d.client.email, d.client.tel] },
+    subtitleLine: `${d.boatName} — du ${d.startDate} au ${d.endDate}`,
+    lineItems: d.lineItems, total: d.lineItems.reduce((s, l) => s + l.amount, 0),
+  }
+}
+
+export function FacturationTab() {
+  const [type, setType] = useState('client')
+  const [, forceUpdate] = useState(0)
+  useEffect(() => subscribe(() => forceUpdate(v => v + 1)), [])
+
+  const tpl = getInvoiceTemplate(type)
+  const set = patch => updateInvoiceTemplate(type, patch)
+  const typeInfo = INVOICE_TYPES.find(t => t.id === type)
+
+  const field = (label, key, placeholder) => (
+    <div>
+      <p className="text-[10px] font-medium text-gray-500 mb-1">{label}</p>
+      <input
+        className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-navy-600"
+        value={tpl[key]}
+        placeholder={placeholder}
+        onChange={e => set({ [key]: e.target.value })}
+      />
+    </div>
+  )
+  const area = (label, key, placeholder, rows = 3) => (
+    <div>
+      <p className="text-xs font-medium text-gray-600 mb-1.5">{label}</p>
+      <textarea
+        className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-navy-600"
+        rows={rows}
+        value={tpl[key]}
+        placeholder={placeholder}
+        onChange={e => set({ [key]: e.target.value })}
+      />
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        {INVOICE_TYPES.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setType(t.id)}
+            className={`px-4 py-2 rounded-xl border text-left transition-colors ${type === t.id ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+          >
+            <p className={`text-sm font-medium ${type === t.id ? 'text-navy-800' : 'text-gray-700'}`}>{t.label}</p>
+            <p className="text-[10px] text-gray-400">{t.sub}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        <div className="flex flex-col gap-4">
+          <Card>
+            <SectionLabel>Aspect</SectionLabel>
+            <div className="flex flex-col gap-3">
+              {field('Titre du document', 'title', 'Facture')}
+              <div>
+                <p className="text-[10px] font-medium text-gray-500 mb-1.5">Couleur</p>
+                <div className="flex gap-2">
+                  {ACCENT_COLORS.map(col => (
+                    <button
+                      key={col.id}
+                      title={col.label}
+                      onClick={() => set({ accent: col.hex })}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ background: col.hex, boxShadow: tpl.accent === col.hex ? `0 0 0 2px #fff, 0 0 0 4px ${col.hex}` : 'none' }}
+                    >
+                      {tpl.accent === col.hex && <Check size={14} className="text-white" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={tpl.showSubtitleLine} onChange={e => set({ showSubtitleLine: e.target.checked })} />
+                Afficher la ligne « bateau et dates »
+              </label>
+            </div>
+          </Card>
+
+          <Card>
+            <SectionLabel>Libellés</SectionLabel>
+            <div className="grid grid-cols-2 gap-3">
+              {field('Émetteur', 'fromLabel', 'De')}
+              {field('Destinataire', 'toLabel', 'Facturé à')}
+              {field('Colonne 1', 'designationLabel', 'Désignation')}
+              {field('Colonne 2', 'amountLabel', 'Montant')}
+              {field('Total', 'totalLabel', 'TOTAL TTC')}
+            </div>
+          </Card>
+
+          <Card>
+            <SectionLabel>Textes en bas de facture</SectionLabel>
+            <div className="flex flex-col gap-3">
+              {area('Conditions de paiement', 'paymentTerms', 'Ex : paiement sous 30 jours par virement.')}
+              {area('Mentions légales', 'legalMentions', 'Ex : raison sociale, forme juridique, SIRET, n° de TVA…')}
+              {area('Message de fin', 'footerNote', 'Merci de votre confiance.', 2)}
+            </div>
+          </Card>
+
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400 max-w-xs">
+              Les lignes (prix, options) viennent de la location et se modifient facture par facture. Une facture déjà {type === 'client' ? 'envoyée' : 'réglée'} garde sa trame d'origine.
+            </p>
+            <button className="btn-ghost text-xs flex-shrink-0" onClick={() => resetInvoiceTemplate(type)}>
+              <RotateCcw size={12} /> Réinitialiser
+            </button>
+          </div>
+        </div>
+
+        <div className="xl:sticky xl:top-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Aperçu en direct — {typeInfo.label.toLowerCase()}</p>
+          <InvoiceSheet {...sampleSheet(type, tpl)} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Options() {
   const [tab, setTab] = useState('options')
   const { activeBrand } = useOutletContext() || { activeBrand: 'midi-nautisme' }
@@ -468,7 +613,7 @@ export default function Options() {
           <p className="text-xs text-gray-400">Catalogue d'options et grille tarifaire de la flotte</p>
         </div>
         <div className="flex border border-gray-200 rounded-xl overflow-hidden">
-          {[{ id: 'options', label: 'Options' }, { id: 'pricing', label: 'Tarifs bateaux' }].map(t => (
+          {[{ id: 'options', label: 'Options' }, { id: 'pricing', label: 'Tarifs bateaux' }, { id: 'facturation', label: 'Facturation' }].map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -482,7 +627,7 @@ export default function Options() {
       </div>
 
       <div className="flex-1 overflow-auto p-5">
-        {tab === 'options' ? <OptionsTab /> : <PricingTab activeBrand={activeBrand} />}
+        {tab === 'options' ? <OptionsTab /> : tab === 'pricing' ? <PricingTab activeBrand={activeBrand} /> : <FacturationTab />}
       </div>
     </div>
   )

@@ -32,7 +32,7 @@ export function SkipperSidebar({ skipper, onLogout, activeTab, setTab }) {
         </div>
       </div>
 
-      <nav className="flex-1 pt-2">
+      <nav className="flex-1 min-h-0 overflow-y-auto pt-2">
         {[
           { id: 'planning', label: 'Planning', icon: Calendar },
           { id: 'missions', label: 'Missions', icon: Clock },
@@ -88,7 +88,7 @@ export function TechSidebar({ tech, onLogout, activeView, setView }) {
         </div>
       </div>
 
-      <nav className="flex-1 pt-2">
+      <nav className="flex-1 min-h-0 overflow-y-auto pt-2">
         {[
           { id: 'equipe', label: 'Équipe du jour', icon: Calendar },
         { id: 'planning', label: 'Mon planning', icon: Calendar },

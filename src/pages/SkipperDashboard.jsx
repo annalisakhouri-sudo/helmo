@@ -347,7 +347,7 @@ export default function SkipperDashboard({ onLogout }) {
   const [mView, setMView] = useState('future')
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
       <SkipperSidebar skipper={SKIPPER} onLogout={onLogout} activeTab={tab} setTab={setTab}/>
       <main className="flex-1 flex flex-col overflow-hidden">
 
