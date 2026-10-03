@@ -213,6 +213,12 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
 }
 
 // VUE MOIS
+// Nom du bateau tel qu'on le reconnaît d'un coup d'œil : "Dufour 360 GL — Yume" -> "Yume".
+// Sans nom propre ("Dufour 350", "Tempest 505"), on garde le modèle complet.
+function boatLabel(name = '') {
+  return name.includes(' — ') ? name.split(' — ').pop() : name.split(' · ')[0]
+}
+
 function MonthView({ date, boats, bookings, onSelect }) {
   const start = startOfMonth(date)
   const end = endOfMonth(date)
@@ -240,8 +246,8 @@ function MonthView({ date, boats, bookings, onSelect }) {
                   const c = getBookingColor(b)
                   const isStart = format(day,'yyyy-MM-dd') === b.start
                   return (
-                    <div key={b.id} className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer truncate ${c.bg} ${c.text} hover:opacity-80`} onClick={() => onSelect(b)}>
-                      {isStart ? `▶ ${b.client.split(' ')[0]}` : `— ${b.boatName?.split(' ')[0]}`}
+                    <div key={b.id} title={`${b.boatName} — ${b.client}`} className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer truncate ${c.bg} ${c.text} hover:opacity-80`} onClick={() => onSelect(b)}>
+                      {isStart ? `▶ ${boatLabel(b.boatName)} · ${b.client.split(' ')[0]}` : `— ${boatLabel(b.boatName)}`}
                     </div>
                   )
                 })}
