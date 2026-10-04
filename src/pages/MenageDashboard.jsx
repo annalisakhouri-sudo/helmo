@@ -1,11 +1,56 @@
 import { useState, useEffect } from 'react'
-import { LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Printer, Receipt, Calendar, Building2 } from 'lucide-react'
+import { X, LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Printer, Receipt, Calendar, Building2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
 import { getMissionsForProvider, getProviderByAccessCode, groupMissionsByAgency, doneByLabel, paidLabel } from '@/lib/menage-missions'
 import { getState, subscribe, toggleMenageDone } from '@/lib/shared-state'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
+
+const STATUS_PILL = {
+  prevu: { label: 'À venir', cls: 'bg-gray-100 text-gray-500' },
+  fait: { label: 'En attente de paiement', cls: 'bg-amber-50 text-amber-700' },
+  regle: { label: 'Réglé', cls: 'bg-teal-50 text-teal-700' },
+}
+const LIST_TITLES = { all: 'Toutes les factures', faits: 'Factures des ménages faits', prevu: 'Factures à venir (ménages pas encore faits)' }
+
+// Liste de factures derrière chaque case du haut : toutes / faits / restant à faire.
+function InvoiceListModal({ filter, missions, showAgency, onClose, onOpenInvoice }) {
+  const list = missions.filter(m => filter === 'all' ? true : filter === 'faits' ? m.done : !m.done)
+  const total = list.reduce((n, m) => n + m.amount, 0)
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-navy-900 px-6 py-4 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="font-display text-white text-base font-bold">{LIST_TITLES[filter]}</h2>
+            <p className="text-navy-100 text-xs">{list.length} facture{list.length > 1 ? 's' : ''} · {total}€</p>
+          </div>
+          <button onClick={onClose} className="text-navy-100 hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 flex flex-col gap-2">
+          {list.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Aucune facture ici pour l'instant.</p>}
+          {list.map(m => {
+            const pill = STATUS_PILL[m.status]
+            return (
+              <button key={m.key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 text-left transition-colors" onClick={() => onOpenInvoice(m)}>
+                <Receipt size={15} className="text-navy-600 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{m.boat}</p>
+                  <p className="text-[11px] text-gray-400 truncate">
+                    {format(parseISO(m.date), 'EEE d MMM', { locale: fr })} · {m.client}{showAgency ? ` · ${m.agencyName}` : ''}
+                  </p>
+                </div>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${pill.cls}`}>{pill.label}</span>
+                <p className="text-sm font-medium text-navy-900 flex-shrink-0 w-12 text-right">{m.amount}€</p>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function CodeLogin({ onSuccess }) {
   const [code, setCode] = useState('')
@@ -50,6 +95,7 @@ export default function MenageDashboard({ onLogout }) {
   const [view, setView] = useState('planning')
   const [reportTab, setReportTab] = useState('fait') // 'prevu' | 'fait' | 'regle'
   const [invoiceMission, setInvoiceMission] = useState(null)
+  const [invoiceList, setInvoiceList] = useState(null) // null | 'all' | 'faits' | 'prevu'
   const [sharedState, setSharedState] = useState(getState())
   useEffect(() => subscribe(s => setSharedState(s)), [])
 
@@ -157,18 +203,16 @@ export default function MenageDashboard({ onLogout }) {
 
         {view === 'planning' && missions.length > 0 && (
           <div className="grid grid-cols-3 gap-3 px-6 pt-5 max-w-2xl print:hidden">
-            <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
-              <p className="font-display text-xl font-bold text-navy-900">{missions.length}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">missions au total</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
-              <p className="font-display text-xl font-bold text-teal-600">{done}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">faits</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
-              <p className="font-display text-xl font-bold text-amber-600">{missions.length - done}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">restant à faire</p>
-            </div>
+            {[
+              { id: 'all', value: missions.length, label: 'missions au total', color: 'text-navy-900', border: 'border-gray-100 hover:bg-gray-50' },
+              { id: 'faits', value: done, label: 'faits', color: 'text-teal-600', border: 'border-teal-100 hover:bg-teal-50' },
+              { id: 'prevu', value: missions.length - done, label: 'restant à faire', color: 'text-amber-600', border: 'border-amber-100 hover:bg-amber-50' },
+            ].map(c => (
+              <button key={c.id} className={`bg-white rounded-xl border p-3.5 text-center transition-colors ${c.border}`} onClick={() => setInvoiceList(c.id)}>
+                <p className={`font-display text-xl font-bold ${c.color}`}>{c.value}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{c.label} · voir les factures →</p>
+              </button>
+            ))}
           </div>
         )}
 
@@ -264,6 +308,15 @@ export default function MenageDashboard({ onLogout }) {
         </div>
       </main>
 
+      {invoiceList && (
+        <InvoiceListModal
+          filter={invoiceList}
+          missions={missions}
+          showAgency={multiAgency}
+          onClose={() => setInvoiceList(null)}
+          onOpenInvoice={setInvoiceMission}
+        />
+      )}
       {invoiceMission && (
         <MenageInvoiceModal mission={invoiceMission} editable={false} onClose={() => setInvoiceMission(null)} />
       )}
