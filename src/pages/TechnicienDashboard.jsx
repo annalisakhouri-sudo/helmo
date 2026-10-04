@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Check, AlertTriangle, ChevronRight, ChevronLeft, X, Anchor, Users, LogOut, Phone, FileText, ClipboardCheck, CircleCheck, PenLine, Calendar, AlertOctagon } from 'lucide-react'
+import { Check, AlertTriangle, Sparkles, Clock, ChevronRight, ChevronLeft, X, Anchor, Users, LogOut, Phone, FileText, ClipboardCheck, CircleCheck, PenLine, Calendar, AlertOctagon } from 'lucide-react'
 import { BOATS, CLIENTS, SKIPPERS, BOOKINGS, DOC_LABELS, TECHNICIANS, OPTIONS_CATALOG } from '@/lib/mock-data'
 import { TechSidebar } from '@/components/layout/SkipperLayout'
 import { getState, toggleTask, subscribe, completeCheckIn, getCheckInProgress, toggleCheckInItem, setCheckInItemsBulk, setCheckInMissing, setCheckInRemarks, setMissionNote, addMissionRequest } from '@/lib/shared-state'
-import { getMissionsForTech } from '@/lib/tech-missions'
+import { getMissionsForTech, getMissionTasks, getMenageStatus } from '@/lib/tech-missions'
 import CheckOutModal from '@/components/planning/CheckOutModal'
 import { addDays, format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWithinInterval, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -13,7 +13,32 @@ import { fr } from 'date-fns/locale'
 const TECH_META = TECHNICIANS.map(t => ({ id: t.id, name: t.name, initials: t.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), color: '#185FA5', base: t.base }))
 
 function getTechMissions(techId) {
-  return getMissionsForTech(techId).map(m => ({ ...m, boatName: m.boat }))
+  const tech = TECHNICIANS.find(t => t.id === techId)
+  return getMissionsForTech(techId).map(m => {
+    if (tech) getMissionTasks(tech, m) // crée la check-list si elle n'existe pas encore
+    return { ...m, boatName: m.boat }
+  })
+}
+
+// Tous les techniciens d'un coup (vue équipe) : leurs check-lists doivent exister aussi.
+TECHNICIANS.forEach(t => getTechMissions(t.id))
+
+// Encart « ménage » : le technicien voit si la société de ménage est passée.
+function MenageStatusCard({ mission }) {
+  const st = getMenageStatus(mission)
+  if (!st) return null
+  const hour = st.meta ? (() => { const d = new Date(st.meta.at); return `${d.getHours()}h${String(d.getMinutes()).padStart(2, '0')}` })() : null
+  return (
+    <div className="flex items-center gap-3 p-3.5 rounded-xl mb-4" style={{ background: st.done ? '#E1F5EE' : '#F3F4F6', border: `1px solid ${st.done ? '#9FE1CB' : '#E5E7EB'}` }}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: st.done ? '#1D9E75' : '#fff' }}>
+        {st.done ? <Check size={15} color="#fff" strokeWidth={3} /> : <Clock size={15} className="text-gray-400" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium" style={{ color: st.done ? '#085041' : '#374151' }}>{st.done ? 'Ménage fait' : 'Ménage pas encore fait'}</p>
+        <p className="text-xs text-gray-500 flex items-center gap-1"><Sparkles size={11} /> {st.providerName}{st.done && hour ? ` · ${st.meta.type === 'agency' ? "confirmé par l'agence" : 'coché'} à ${hour}` : ' · nettoyage géré par la société'}</p>
+      </div>
+    </div>
+  )
 }
 
 const CHECKLIST_ITEMS = [
@@ -526,6 +551,8 @@ function TechMission({ tech, mission, tasks, onBack, onToggle, sharedState }) {
             <a href={`tel:${skipper.phone}`} className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5"><Phone size={12}/>{skipper.phone}</a>
           </div>
         </div>)}
+
+        <MenageStatusCard mission={mission} />
 
         <p className="section-label">Tâches de préparation</p>
         <div className="flex flex-col gap-2 mb-4">

@@ -16,6 +16,8 @@ export default function MenageInvoiceModal({ mission, editable, onClose }) {
   const tpl = invoice.templateSnapshot || getInvoiceTemplate('menage')
   const isPaid = invoice.status === 'payee'
   const canEdit = editable && !isPaid
+  // On ne règle qu'un ménage effectivement fait.
+  const canPay = canEdit && mission.done
   const total = data.lineItems.reduce((sum, li) => sum + (Number(li.amount) || 0), 0)
 
   const sheet = {
@@ -35,9 +37,9 @@ export default function MenageInvoiceModal({ mission, editable, onClose }) {
       <div className="bg-gray-50 rounded-2xl shadow-xl w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2 flex-shrink-0">
           {isPaid ? (
-            <><CircleCheck size={16} className="text-teal-600" /><span className="text-xs font-medium text-teal-700">Réglée le {invoice.paidAt}</span></>
+            <><CircleCheck size={16} className="text-teal-600" /><span className="text-xs font-medium text-teal-700">Réglée le {new Date(invoice.paidAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} {invoice.paidVia === 'stripe' ? '· en ligne' : '· manuellement'}</span></>
           ) : (
-            <><Receipt size={14} className="text-gray-400" /><span className="text-xs text-gray-500">En attente de règlement</span></>
+            <><Receipt size={14} className="text-gray-400" /><span className="text-xs text-gray-500">{mission.done ? 'En attente de règlement' : 'Ménage pas encore fait'}</span></>
           )}
           <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-700"><X size={18} /></button>
         </div>
@@ -52,8 +54,8 @@ export default function MenageInvoiceModal({ mission, editable, onClose }) {
 
         <div className="bg-white border-t border-gray-100 p-4 flex gap-3 flex-shrink-0">
           <button className="btn-ghost" onClick={download}><Download size={14} /> Télécharger le PDF</button>
-          {canEdit && (
-            <button className="btn-primary flex-1 justify-center" onClick={() => markMenageInvoicePaid(mission.key)}>
+          {canPay && (
+            <button className="btn-primary flex-1 justify-center" onClick={() => markMenageInvoicePaid(mission.key, 'manuel')}>
               <CircleCheck size={14} /> Marquer comme réglée
             </button>
           )}

@@ -3,8 +3,8 @@ import { Plus, X, Check, AlertTriangle, Bell, ChevronRight, MapPin, Calendar, Cl
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { TECHNICIANS } from '@/lib/mock-data'
-import { getMissionsForTech } from '@/lib/tech-missions'
-import { getState, subscribe, getTechTasks, toggleTask as sharedToggleTask, assignMission, resolveMissionRequest } from '@/lib/shared-state'
+import { getMissionsForTech, getMissionTasks } from '@/lib/tech-missions'
+import { getState, subscribe, toggleTask as sharedToggleTask, assignMission, resolveMissionRequest } from '@/lib/shared-state'
 import { Card, SectionLabel } from '@/components/ui'
 
 const BASES = [
@@ -18,11 +18,7 @@ const BASES = [
 // immédiatement chez le technicien concerné.
 function buildTechsFromBookings(extraTechs) {
   return [...TECHNICIANS, ...extraTechs].map(tech => {
-    const missions = getMissionsForTech(tech.id).map(m => {
-      const seedTasks = tech.tasks?.[m.boatId] // tâches spécifiques déjà présentes dans les données de démo, si dispo
-      const defaultTasks = (seedTasks && seedTasks.length ? seedTasks : m.defaultTasks).map((t, i) => ({ id: `${m.key}-${i}`, label: t.label, done: t.done ?? false }))
-      return { ...m, tasks: getTechTasks(tech.id, m.key, defaultTasks) }
-    })
+    const missions = getMissionsForTech(tech.id).map(m => ({ ...m, tasks: getMissionTasks(tech, m) }))
     return { id: tech.id, name: tech.name, phone: tech.phone, base: tech.base, planning: missions, notifications: [] }
   })
 }

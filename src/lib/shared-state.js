@@ -20,6 +20,9 @@ let state = {
   // menageDone : missionKey -> bool. Le prestataire de ménage étant une société tierce (pas connectée
   // à Helmo), l'agence coche elle-même quand le nettoyage est confirmé fait.
   menageDone: {},
+  // menageDoneMeta : missionKey -> { type: 'provider' | 'agency', name, at }
+  // Qui a coché « ménage fait » et quand (la société elle-même, ou l'agence en rattrapage).
+  menageDoneMeta: {},
   // menageInvoices : missionKey -> { content, status: 'generee' | 'payee', paidAt }
   // Facture automatique entre l'agence et le prestataire de ménage, visible des deux côtés.
   menageInvoices: {},
@@ -277,15 +280,24 @@ export function updateMenageInvoiceLineItem(missionKey, lineId, field, value) {
   listeners.forEach(fn => fn(state))
 }
 
-export function markMenageInvoicePaid(missionKey) {
+// via : 'stripe' (paiement en ligne dans Helmo → réglé automatiquement)
+//     | 'manuel' (virement, chèque… l'agence coche elle-même).
+// Pour l'instant le paiement Stripe est SIMULÉ (démo) : en production, c'est le webhook
+// Stripe qui appellera cette fonction une fois le paiement confirmé.
+export function markMenageInvoicePaid(missionKey, via = 'manuel') {
   const current = state.menageInvoices[missionKey]
   if (!current) return
-  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, status: 'payee', paidAt: '2026-07-04', templateSnapshot: state.invoiceTemplates.menage } } }
+  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, status: 'payee', paidAt: '2026-07-04', paidVia: via, templateSnapshot: state.invoiceTemplates.menage } } }
   listeners.forEach(fn => fn(state))
 }
 
-export function toggleMenageDone(missionKey) {
-  state = { ...state, menageDone: { ...state.menageDone, [missionKey]: !state.menageDone[missionKey] } }
+// by : { type: 'provider' | 'agency', name } — qui coche. Décocher efface la trace.
+export function toggleMenageDone(missionKey, by = { type: 'agency', name: "l'agence" }) {
+  const nowDone = !state.menageDone[missionKey]
+  const meta = { ...state.menageDoneMeta }
+  if (nowDone) meta[missionKey] = { ...by, at: new Date().toISOString() }
+  else delete meta[missionKey]
+  state = { ...state, menageDone: { ...state.menageDone, [missionKey]: nowDone }, menageDoneMeta: meta }
   listeners.forEach(fn => fn(state))
 }
 

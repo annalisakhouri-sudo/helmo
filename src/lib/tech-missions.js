@@ -1,6 +1,7 @@
 import { parseISO, addDays, format } from 'date-fns'
 import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from './mock-data'
-import { getState } from './shared-state'
+import { getState, getTechTasks } from './shared-state'
+import { getMenageForTechMission } from './menage-missions'
 
 export const TODAY_STR = '2026-07-04'
 
@@ -73,6 +74,9 @@ export function buildAllMissions() {
     const defaultTech = getDefaultTechForBoat(b.boatId)
     if (!defaultTech) return
     const realClient = CLIENTS.find(c => c.locations.includes(b.id))
+    // Société de ménage qui intervient avant ce départ / à ce retour (null = le technicien nettoie).
+    const menageDepart = getMenageForTechMission('depart', b)
+    const menageRetour = getMenageForTechMission('retour', b)
     // Sortie d'un jour : départ et retour le même jour (sinon le retour tombait la veille).
     const isDayTrip = b.start === b.end
 
@@ -96,6 +100,7 @@ export function buildAllMissions() {
       heure: isDayTrip ? '09:00' : '08:30',
       statut: computeStatut(b.start),
       defaultTasks: isDayTrip ? DEPART_JOURNEE_TASKS : DEFAULT_DEPART_TASKS,
+      menage: menageDepart,
     })
 
     // ── Retour ──
@@ -121,6 +126,7 @@ export function buildAllMissions() {
       moment: isDayTrip ? 'Fin de sortie' : hasLastNight ? 'Samedi matin' : 'Vendredi soir',
       statut: computeStatut(retourDate),
       defaultTasks: isDayTrip ? RETOUR_JOURNEE_TASKS : hasLastNight ? RETOUR_SAMEDI_TASKS : RETOUR_VENDREDI_TASKS,
+      menage: menageRetour,
     })
   })
 
@@ -137,4 +143,27 @@ export function buildAllMissions() {
 
 export function getMissionsForTech(techId) {
   return buildAllMissions().filter(m => m.techId === techId)
+}
+
+// Tâches « nettoyage » retirées de la check-list quand une société de ménage s'en charge.
+const CLEANING_TASK = /^nettoyage/i
+
+// Check-list d'une mission pour un technicien. Source UNIQUE pour la page Techniciens (agence)
+// et l'app technicien : crée la liste au premier accès (sinon l'app technicien restait vide
+// tant que l'agence n'avait pas ouvert sa page).
+export function getMissionTasks(tech, mission) {
+  const seedTasks = tech.tasks?.[mission.boatId] // tâches de démo déjà présentes pour ce bateau
+  const source = seedTasks && seedTasks.length ? seedTasks : mission.defaultTasks
+  const defaults = source
+    .filter(t => !(mission.menage && CLEANING_TASK.test(t.label)))
+    .map((t, i) => ({ id: `${mission.key}-${i}`, label: t.label, done: t.done ?? false }))
+  return getTechTasks(tech.id, mission.key, defaults)
+}
+
+// Statut du ménage visible par le technicien : fait ou pas, par qui.
+export function getMenageStatus(mission) {
+  if (!mission.menage) return null
+  const st = getState()
+  const done = !!st.menageDone[mission.menage.key]
+  return { ...mission.menage, done, meta: st.menageDoneMeta?.[mission.menage.key] || null }
 }

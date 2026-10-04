@@ -3,7 +3,7 @@ import { LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Printer, Receipt, Ca
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
-import { getMissionsForProvider, getProviderByAccessCode, groupMissionsByAgency, buildPeriodSummary } from '@/lib/menage-missions'
+import { getMissionsForProvider, getProviderByAccessCode, groupMissionsByAgency, doneByLabel, paidLabel } from '@/lib/menage-missions'
 import { getState, subscribe, toggleMenageDone } from '@/lib/shared-state'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
@@ -48,7 +48,7 @@ function CodeLogin({ onSuccess }) {
 export default function MenageDashboard({ onLogout }) {
   const [providerId, setProviderId] = useState(null)
   const [view, setView] = useState('planning')
-  const [periodType, setPeriodType] = useState('week')
+  const [reportTab, setReportTab] = useState('fait') // 'prevu' | 'fait' | 'regle'
   const [invoiceMission, setInvoiceMission] = useState(null)
   const [sharedState, setSharedState] = useState(getState())
   useEffect(() => subscribe(s => setSharedState(s)), [])
@@ -61,7 +61,13 @@ export default function MenageDashboard({ onLogout }) {
   const pct = missions.length ? Math.round((done / missions.length) * 100) : 0
   const agencyGroups = groupMissionsByAgency(missions)
   const multiAgency = agencyGroups.length > 1
-  const periods = buildPeriodSummary(missions, periodType)
+  const REPORT_TABS = [
+    { id: 'prevu', label: 'À venir' },
+    { id: 'fait', label: 'En attente de paiement' },
+    { id: 'regle', label: 'Réglés' },
+  ]
+  const owedTotal = missions.filter(m => m.status === 'fait').reduce((n, m) => n + m.amount, 0)
+  const paidTotal = missions.filter(m => m.status === 'regle').reduce((n, m) => n + m.amount, 0)
 
   function weekGroups(items) {
     const groups = []
@@ -75,17 +81,20 @@ export default function MenageDashboard({ onLogout }) {
 
   function MissionRow({ m }) {
     const isFriday = m.heure === '17:30'
+    // Un ménage déjà réglé ne se décoche plus.
+    const toggle = () => { if (m.status !== 'regle') toggleMenageDone(m.key, { type: 'provider', name: provider.company }) }
     return (
       <div className={`flex items-center gap-3 p-3.5 rounded-xl border transition-colors ${m.done ? 'bg-teal-50 border-teal-100' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
         <div
           className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer ${m.done ? 'bg-teal-400' : 'border-2 border-gray-300 bg-white'}`}
-          onClick={() => toggleMenageDone(m.key)}
+          onClick={toggle}
         >
           {m.done && <Check size={12} className="text-white" />}
         </div>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleMenageDone(m.key)}>
-          <p className={`text-sm font-medium ${m.done ? 'text-teal-800 line-through opacity-70' : 'text-gray-800'}`}>{m.boat}</p>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={toggle}>
+          <p className={`text-sm font-medium ${m.done ? 'text-teal-800' : 'text-gray-800'}`}>{m.boat}</p>
           <p className="text-xs text-gray-400">{m.client} · {format(parseISO(m.date), 'EEEE d MMM', { locale: fr })} · {m.heure}</p>
+          {m.done && <p className="text-[10px] text-teal-700 mt-0.5">{m.status === 'regle' ? paidLabel(m) : doneByLabel(m)}</p>}
         </div>
         <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1" onClick={() => setInvoiceMission(m)}>
           <Receipt size={10} /> Facture
@@ -139,15 +148,9 @@ export default function MenageDashboard({ onLogout }) {
         <div className="topbar bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between print:hidden">
           <div>
             <h1 className="font-display text-base font-bold">{view === 'planning' ? 'Mon planning ménage' : 'Compte rendu'}</h1>
-            <p className="text-xs text-gray-400">{missions.length} mission{missions.length > 1 ? 's' : ''} · {pct}% confirmées faites</p>
+            <p className="text-xs text-gray-400">{missions.length} mission{missions.length > 1 ? 's' : ''} · {pct}% faits</p>
           </div>
           <div className="flex items-center gap-2">
-            {view === 'rapport' && (
-              <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-                <button className={`text-xs px-2.5 py-1 rounded-md ${periodType === 'week' ? 'bg-white shadow-sm font-medium' : 'text-gray-500'}`} onClick={() => setPeriodType('week')}>Semaine</button>
-                <button className={`text-xs px-2.5 py-1 rounded-md ${periodType === 'month' ? 'bg-white shadow-sm font-medium' : 'text-gray-500'}`} onClick={() => setPeriodType('month')}>Mois</button>
-              </div>
-            )}
             <button className="btn-ghost text-xs" onClick={() => window.print()}><Printer size={13} /> Imprimer</button>
           </div>
         </div>
@@ -160,7 +163,7 @@ export default function MenageDashboard({ onLogout }) {
             </div>
             <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
               <p className="font-display text-xl font-bold text-teal-600">{done}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">confirmées faites</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">faits</p>
             </div>
             <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
               <p className="font-display text-xl font-bold text-amber-600">{missions.length - done}</p>
@@ -202,27 +205,60 @@ export default function MenageDashboard({ onLogout }) {
               </div>
             )
           ) : (
-            <div className="flex flex-col gap-3">
-              {periods.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 text-center border border-gray-100">
-                  <p className="text-sm text-gray-400">Aucune donnée pour l'instant.</p>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-xl border border-amber-100 p-3.5">
+                  <p className="font-display text-xl font-bold text-amber-600">{owedTotal}€</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">en attente de paiement</p>
                 </div>
-              ) : periods.map(period => (
-                <div key={period.key} className="bg-white rounded-xl border border-gray-100 p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-semibold">
-                      {periodType === 'month'
-                        ? format(parseISO(`${period.key}-01`), 'MMMM yyyy', { locale: fr })
-                        : `Semaine du ${format(parseISO(period.key), 'd MMMM', { locale: fr })}`}
-                    </p>
-                    <p className="text-sm font-bold text-navy-900">{period.planned}€ <span className="text-[10px] font-normal text-gray-400">prévus</span></p>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
-                    <div className="h-1.5 rounded-full bg-teal-400" style={{ width: `${period.planned ? Math.round((period.total / period.planned) * 100) : 0}%` }} />
-                  </div>
-                  <p className="text-xs text-gray-400">{period.doneCount} ménage{period.doneCount > 1 ? 's' : ''} confirmé{period.doneCount > 1 ? 's' : ''} sur {period.missions.length} · <span className="text-teal-700 font-medium">{period.total}€ confirmés</span></p>
+                <div className="bg-white rounded-xl border border-teal-100 p-3.5">
+                  <p className="font-display text-xl font-bold text-teal-600">{paidTotal}€</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">déjà réglés</p>
                 </div>
-              ))}
+              </div>
+
+              <div className="flex gap-1.5 print:hidden">
+                {REPORT_TABS.map(t => (
+                  <button key={t.id} onClick={() => setReportTab(t.id)} className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${reportTab === t.id ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                    {t.label} ({missions.filter(m => m.status === t.id).length})
+                  </button>
+                ))}
+              </div>
+
+              {agencyGroups.map(ag => {
+                const items = ag.items.filter(m => m.status === reportTab)
+                const total = items.reduce((n, m) => n + m.amount, 0)
+                return (
+                  <div key={ag.agencyName} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50">
+                      <Building2 size={14} className="text-navy-600" />
+                      <p className="text-sm font-semibold text-navy-800 flex-1">{ag.agencyName}</p>
+                      <p className="text-sm font-bold text-navy-900">{total}€</p>
+                    </div>
+                    {items.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-4 py-4">Rien dans cette catégorie pour cette agence.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {items.map(m => (
+                          <div key={m.key} className="flex items-center gap-3 px-4 py-2.5">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{m.boat}</p>
+                              <p className="text-[11px] text-gray-400">
+                                {format(parseISO(m.date), 'EEE d MMM', { locale: fr })} · {m.client}
+                                {m.status === 'regle' && <> · <span className="text-teal-700">{paidLabel(m)}</span></>}
+                              </p>
+                            </div>
+                            <p className="text-sm font-medium text-navy-900 flex-shrink-0">{m.amount}€</p>
+                            <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1 print:hidden" onClick={() => setInvoiceMission(m)}>
+                              <Receipt size={10} /> Facture
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
