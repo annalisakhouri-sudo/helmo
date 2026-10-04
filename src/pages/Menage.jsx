@@ -4,9 +4,9 @@ import { Sparkles, Phone, Mail, Check, ChevronRight, X, Building2, Copy, Receipt
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
-import { getMissionsForProvider, doneByLabel, paidLabel } from '@/lib/menage-missions'
+import { getMissionsForProvider, getUnconfirmedMenages, doneByLabel, paidLabel } from '@/lib/menage-missions'
 import { buildMenageInvoiceData } from '@/lib/menage-invoice'
-import { getState, subscribe, toggleMenageDone, getMenageInvoice, markMenageInvoicePaid } from '@/lib/shared-state'
+import { getState, subscribe, toggleMenageDone, getMenageInvoice, markMenageInvoicePaid, sendMenageRequest, respondMenageRequest } from '@/lib/shared-state'
 import { Card } from '@/components/ui'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
@@ -180,6 +180,7 @@ export default function Menage() {
   const toPay = allMissions.filter(m => m.status === 'fait')
   const toPayAmount = toPay.reduce((n, m) => n + m.amount, 0)
   // Garde la facture ouverte à jour (montant, statut) quand l'état change.
+  const unconfirmed = getUnconfirmedMenages(activeBrand)
   const liveInvoiceMission = invoiceMission && allMissions.find(m => m.key === invoiceMission.key)
 
   return (
@@ -211,6 +212,36 @@ export default function Menage() {
           <Building2 size={14} className="text-navy-600 flex-shrink-0" />
           <p className="text-xs text-navy-700">Chaque ménage suit le même circuit : <strong>prévu → fait → réglé</strong>. « À régler » = ménages faits pas encore payés.</p>
         </div>
+
+        {unconfirmed.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">En attente de confirmation ({unconfirmed.length})</p>
+            <div className="flex flex-col gap-2">
+              {unconfirmed.map(m => (
+                <div key={m.key} className={`rounded-xl border p-3 flex items-center gap-3 ${m.requestStatus === 'refusee' ? 'border-danger-100 bg-danger-50' : 'border-amber-100 bg-amber-50'}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{m.boat} <span className="text-xs font-normal text-gray-500">· {fmtDay(m.date)} · {m.client}</span></p>
+                    <p className={`text-[11px] ${m.requestStatus === 'refusee' ? 'text-danger-700' : 'text-amber-700'}`}>
+                      {m.requestStatus === 'refusee' ? `${m.providerName} a refusé — choisis une autre société` : `Demande et facture (${m.amount}€) envoyées à ${m.providerName} · en attente de sa réponse`}
+                    </p>
+                  </div>
+                  {m.requestStatus === 'refusee' ? (
+                    <select className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" defaultValue="" onChange={e => e.target.value && sendMenageRequest(m.bookingId, e.target.value)}>
+                      <option value="">Renvoyer à…</option>
+                      {MENAGE_PROVIDERS.filter(p => p.id !== m.providerId).map(p => <option key={p.id} value={p.id}>{p.company}</option>)}
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-[10px] text-gray-400">Démo :</span>
+                      <button className="text-[10px] font-medium px-2 py-1 rounded-full bg-white text-teal-700 border border-teal-100" onClick={() => respondMenageRequest(m.bookingId, true)}>elle accepte</button>
+                      <button className="text-[10px] font-medium px-2 py-1 rounded-full bg-white text-gray-500 border border-gray-200" onClick={() => respondMenageRequest(m.bookingId, false)}>elle refuse</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Card className="divide-y divide-gray-50">
           {providers.map(p => {

@@ -382,7 +382,7 @@ export const BOOKINGS = [
     skipperId: null, skipperName: null, skipperInitials: null,
     needsSkipper: true,
     draps: [],
-    options: { annexe: true, franchise: { qty: 1 } },
+    options: { franchise: { qty: 1 } },
     status: 'skipper-missing', color: 'amber',
     lastNightAboard: false,
   },
@@ -654,7 +654,7 @@ export const BOOKINGS = [
     id: 'bk-29', boatId: 'mn-5', boatName: 'Astrea 42 — Bôrev', brand: 'midi-nautisme',
     clientId: 'cli-9', client: 'Perrin Claire', phone: '06 66 77 88 99', guests: '2 adultes, 2 enfants',
     start: '2026-07-25', end: '2026-08-01',
-    skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
+    skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
     needsSkipper: true,
     draps: [],
     status: 'confirmed', color: 'teal',
@@ -769,7 +769,7 @@ export const BOOKINGS = [
     id: 'bk-40', boatId: 'mn-6', boatName: '460 — L\'After', brand: 'midi-nautisme',
     clientId: 'cli-4', client: 'Legrand François', phone: '06 77 88 99 00', guests: '4 adultes, 1 enfant',
     start: '2026-08-22', end: '2026-08-29',
-    skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
+    skipperName: 'Legrand François', skipperInitials: 'LF', clientIsSkipper: true,
     needsSkipper: true,
     draps: [],
     options: { menage: true },
@@ -853,7 +853,7 @@ export const BOOKINGS = [
     id: 'bk-48', boatId: 'mn-8', boatName: 'Elba 45 — Sirena', brand: 'midi-nautisme',
     clientId: 'cli-4', client: 'Legrand François', phone: '06 77 88 99 00', guests: '4 adultes, 1 enfant',
     start: '2026-08-01', end: '2026-08-08',
-    skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
+    skipperId: 'skip-2', skipperName: 'Sophie Bernard', skipperInitials: 'SB',
     needsSkipper: true,
     draps: [{ name: 'Grand lit 160×200', qty: 1, unit: 'jeu' }],
     options: { menage: true },
@@ -916,7 +916,7 @@ export const BOOKINGS = [
     id: 'bk-54', boatId: 'mn-9', boatName: 'Dufour 48 — Petrel', brand: 'midi-nautisme',
     clientId: 'cli-2', client: 'Bernard Laurent', phone: '07 11 22 33 44', guests: '5 adultes',
     start: '2026-08-15', end: '2026-08-22',
-    skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
+    skipperName: 'Bernard Laurent', skipperInitials: 'BL', clientIsSkipper: true,
     needsSkipper: true,
     draps: [],
     options: { menage: true },
@@ -990,7 +990,7 @@ export const BOOKINGS = [
     id: 'bk-61', boatId: 'mn-11', boatName: 'Dufour 41 — Lou Calèu', brand: 'midi-nautisme',
     clientId: 'cli-4', client: 'Legrand François', phone: '06 77 88 99 00', guests: '3 adultes',
     start: '2026-07-04', end: '2026-07-18',
-    skipperId: 'skip-2', skipperName: 'Sophie Bernard', skipperInitials: 'SB',
+    skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
     needsSkipper: true,
     draps: [],
     status: 'confirmed', color: 'teal',
@@ -1032,7 +1032,7 @@ export const BOOKINGS = [
     id: 'bk-65', boatId: 'mn-11', boatName: 'Dufour 41 — Lou Calèu', brand: 'midi-nautisme',
     clientId: 'cli-9', client: 'Perrin Claire', phone: '06 66 77 88 99', guests: '5 adultes',
     start: '2026-08-15', end: '2026-08-22',
-    skipperId: 'skip-1', skipperName: 'Jean-Marc Rossi', skipperInitials: 'JM',
+    skipperId: 'skip-3', skipperName: 'Thomas Lebrun', skipperInitials: 'TL',
     needsSkipper: true,
     draps: [],
     status: 'confirmed', color: 'teal',
@@ -1619,7 +1619,7 @@ export const OPTIONS_CATALOG = [
   { id: 'draps', label: 'Draps & linge', icon: 'Shirt', hasSub: true, price: 15, unit: '/ jeu', active: true, description: 'Jeu de draps et serviettes par cabine' },
   { id: 'carbu', label: 'Carburant inclus', icon: 'Fuel', hasSub: false, price: 80, unit: 'forfait', active: true, description: 'Plein de carburant inclus au départ' },
   { id: 'sup', label: 'SUP', icon: 'Waves', hasSub: true, price: 25, unit: '/ semaine', active: true, description: 'Paddle gonflable avec pagaie' },
-  { id: 'annexe', label: 'Annexe / zodiac', icon: 'Sailboat', hasSub: false, price: 60, unit: '/ semaine', active: true, description: 'Annexe avec moteur hors-bord' },
+  // Annexe : plus une option — elle est obligatoire et fait partie de l'équipement vérifié au check-in / check-out.
   { id: 'taud', label: 'Taud de soleil', icon: 'Sun', hasSub: false, price: 20, unit: '/ semaine', active: true, description: 'Taud de soleil pour le cockpit' },
   { id: 'masque', label: 'Masque & tuba', icon: 'Glasses', hasSub: true, price: 8, unit: '/ jeu', active: true, description: 'Équipement snorkeling par personne' },
   { id: 'franchise', label: 'Franchise réduite', icon: 'ShieldCheck', hasSub: true, price: 90, unit: 'forfait', active: true, description: 'Réduction de la franchise en cas de dommage' },
@@ -1633,3 +1633,11 @@ export const DOC_LABELS = {
   securite:     'Carnet sécurité',
   jauge:        'Jauge officielle',
 }
+
+// ── Historique client ─────────────────────────────────────────────
+// Chaque client récupère TOUTES ses locations du planning (rattachement par nom tant que
+// les locations n'ont pas d'identifiant client). En production : clé client_id en base.
+CLIENTS.forEach(c => {
+  const ids = BOOKINGS.filter(b => b.client === `${c.nom} ${c.prenom}`).map(b => b.id)
+  c.locations = [...new Set([...c.locations, ...ids])]
+})

@@ -8,6 +8,7 @@ import { clsx } from 'clsx'
 import { BRANDS } from '@/lib/mock-data'
 import GlobalSearch from './GlobalSearch'
 import { getUrgentClientAlerts, subscribeClients } from '@/lib/client-alerts'
+import { getTotalUnread, subscribeMessages } from '@/lib/messaging'
 
 const NAV = [
   {
@@ -36,7 +37,7 @@ const NAV = [
       { to: '/skippers', label: 'Skippers', icon: Users },
       { to: '/techniciens', label: 'Techniciens', icon: Wrench },
       { to: '/menage', label: 'Ménage', icon: Sparkles },
-      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle },
+      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle, badge: 'messages' },
     ],
   },
 ]
@@ -46,7 +47,8 @@ export default function AppLayout({ user, onLogout }) {
   const brand = BRANDS[activeBrand]
   const [, refresh] = useState(0)
   useEffect(() => subscribeClients(() => refresh(v => v + 1)), [])
-  const badges = { clientAlerts: getUrgentClientAlerts().length }
+  useEffect(() => subscribeMessages(() => refresh(v => v + 1)), [])
+  const badges = { clientAlerts: getUrgentClientAlerts().length, messages: getTotalUnread('agency') }
 
   return (
     <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">

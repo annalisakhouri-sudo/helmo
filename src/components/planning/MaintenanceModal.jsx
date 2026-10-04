@@ -48,6 +48,8 @@ export function buildChecklist(boat, booking) {
   ] : [
     { id: 'n1', label: 'Jerricane carburant', max: 2 },
     { id: 'n2', label: 'Fenders', max: 6 },
+    { id: 'n5', label: 'Annexe (gonflée, sans fuite)', max: 1 },
+    { id: 'n6', label: 'Moteur hors-bord annexe', max: 1 },
   ]})
 
   const dynamicItems = []

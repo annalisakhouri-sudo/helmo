@@ -1,9 +1,11 @@
+import { getRequest } from '@/lib/skipper-requests'
+import { addBooking } from '@/lib/bookings'
 import { useState, useEffect } from 'react'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check, Sparkles } from 'lucide-react'
 import { addDays, addMonths, format, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, getDay, endOfWeek } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from '@/lib/mock-data'
+import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS, SKIPPERS } from '@/lib/mock-data'
 import BookingDetail from '@/components/planning/BookingDetail'
 import NewBookingModal from '@/components/planning/NewBookingModal'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
@@ -422,8 +424,12 @@ export default function Planning() {
             {skipperMissing.map(b => (
               <div key={b.id} className="alert-warn mb-2">
                 <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
-                <span className="flex-1 text-sm text-amber-800"><strong>{b.boatName}</strong> — {b.client} : skipper requis non assigné</span>
-                <button className="btn-primary py-1 px-3 text-xs" onClick={() => navigate('/skippers')}>Trouver →</button>
+                <span className="flex-1 text-sm text-amber-800">
+                  <strong>{b.boatName}</strong> — {b.client} : {getRequest(b.id)?.status === 'en_attente'
+                    ? `demande envoyée à ${SKIPPERS.find(sk => sk.id === getRequest(b.id).skipperId)?.name}, en attente`
+                    : 'skipper requis non assigné'}
+                </span>
+                <button className="btn-primary py-1 px-3 text-xs" onClick={() => setSelected(b)}>{getRequest(b.id)?.status === 'en_attente' ? 'Voir →' : 'Trouver →'}</button>
               </div>
             ))}
           </div>
@@ -431,7 +437,7 @@ export default function Planning() {
       </div>
 
       {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onFindSkipper={() => navigate('/skippers')} onViewDocs={() => navigate('/bateaux')} onViewClientDocs={() => navigate('/clients')} onViewClient={() => { const c = CLIENTS.find(c => c.locations.includes(selected.id)); navigate(c ? `/clients?client=${c.id}` : '/clients') }} onBookingChange={() => forcePlanningUpdate(v => v + 1)} />}
-      {showNew && <NewBookingModal activeBrand={activeBrand} onClose={() => setShowNew(false)} onAdd={b => setExtraBookings(prev => [...prev, b])} />}
+      {showNew && <NewBookingModal activeBrand={activeBrand} onClose={() => setShowNew(false)} onAdd={b => { addBooking(b); forcePlanningUpdate(v => v + 1) }} />}
 
       {gapInfo && (() => {
         const nextBooking = allBookings.find(o => o.boatId === gapInfo.boat.id && o.start === gapInfo.booking.end)

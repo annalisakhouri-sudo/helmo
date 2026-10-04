@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { X, AlertTriangle, Check, CircleCheck, FileText, Send } from 'lucide-react'
-import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, CONTRACT_TEMPLATES } from '@/lib/mock-data'
+import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, CONTRACT_TEMPLATES, MENAGE_PROVIDERS } from '@/lib/mock-data'
+import { getDefaultMenageForBoat } from '@/lib/menage-missions'
+import { sendSkipperRequest } from '@/lib/skipper-requests'
 import { buildContractContent, getDefaultTemplateId } from '@/lib/contract'
 import { setContractTemplate, sendContract } from '@/lib/shared-state'
 import OptionIcon from '@/components/ui/OptionIcon'
@@ -63,7 +65,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
     boatId: '', dateStart: '', dateEnd: '', guests: '',
     nom: '', prenom: '', tel: '', email: '',
     options: {}, freeOptions: {}, basePrice: '', basePriceAuto: null, discountPercent: '0',
-    skipperName: '', cabines: '3', supQty: '2', masqueQty: '3', franchise: '1500', statut: 'confirmed', dureeOption: '48h', lastNightAboard: true,
+    skipperName: '', skipperId: '', menageProviderId: '', cabines: '3', supQty: '2', masqueQty: '3', franchise: '1500', statut: 'confirmed', dureeOption: '48h', lastNightAboard: true,
   })
 
   const [contractTemplateId, setContractTemplateId] = useState(null)
@@ -89,7 +91,12 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
   }
 
   function toggleOpt(id) {
-    setForm(f => ({ ...f, options: { ...f.options, [id]: !f.options[id] } }))
+    setForm(f => ({
+      ...f,
+      options: { ...f.options, [id]: !f.options[id] },
+      // Ménage coché : société présélectionnée = celle qui s'occupe habituellement de ce bateau.
+      ...(id === 'menage' && !f.options.menage && !f.menageProviderId ? { menageProviderId: getDefaultMenageForBoat(f.boatId)?.id || MENAGE_PROVIDERS[0]?.id || '' } : {}),
+    }))
     if (id === 'franchise' && errors.franchise) setErrors(e => ({ ...e, franchise: '' }))
     // Si on décoche une option, on retire aussi son statut "offerte"
     setForm(f => {
@@ -180,8 +187,9 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
       guests: form.guests,
       start: form.dateStart,
       end: form.dateEnd,
-      skipperName: form.options.skipper ? form.skipperName : null,
+      skipperName: null,
       needsSkipper: !!form.options.skipper,
+      menageProviderId: form.options.menage ? form.menageProviderId : null,
       draps: form.options.draps ? [{ name: `${form.cabines} cabine(s)`, qty: parseInt(form.cabines), unit: 'jeux' }] : [],
       status: form.options.skipper ? 'confirmed' : 'confirmed',
       color: 'teal',
@@ -191,6 +199,10 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
       discountPercent: parseFloat(form.discountPercent) || 0,
       lastNightAboard: form.lastNightAboard,
     })
+    // Skipper choisi à la création → vraie demande (il est affecté quand il accepte).
+    if (form.options.skipper && form.skipperId) {
+      sendSkipperRequest({ id: newId, boatName: boat?.name || '', start: form.dateStart, end: form.dateEnd, guests: form.guests }, form.skipperId)
+    }
     if (contractContent) {
       setContractTemplate(newId, contractTemplateId, contractContent)
       if (sendContractNow) sendContract(newId)
@@ -217,7 +229,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
         <p className="text-sm text-gray-400 mb-6">Elle apparaît maintenant dans le planning.</p>
         <div className="flex gap-3">
           <button className="btn-primary flex-1 justify-center" onClick={onClose}>Voir le planning</button>
-          <button className="btn-ghost flex-1 justify-center" onClick={() => { setDone(false); setStep(1); setForm({ boatId:'',dateStart:'',dateEnd:'',guests:'',nom:'',prenom:'',tel:'',email:'',options:{},skipperName:'',cabines:'3',supQty:'2',masqueQty:'3',franchise:'1500' }) }}>
+          <button className="btn-ghost flex-1 justify-center" onClick={() => { setDone(false); setStep(1); setForm({ boatId:'',dateStart:'',dateEnd:'',guests:'',nom:'',prenom:'',tel:'',email:'',options:{},skipperName:'',skipperId:'',menageProviderId:'',freeOptions:{},cabines:'3',supQty:'2',masqueQty:'3',franchise:'1500' }) }}>
             + Nouvelle loc
           </button>
         </div>
@@ -455,13 +467,25 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
                     )}
                   </div>
 
+                  {form.options[opt.id] && opt.id === 'menage' && (
+                    <div className="mt-2" onClick={e => e.stopPropagation()}>
+                      <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" value={form.menageProviderId} onChange={e => set('menageProviderId', e.target.value)}>
+                        {MENAGE_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.company}{getDefaultMenageForBoat(form.boatId)?.id === p.id ? ' (habituelle)' : ''}</option>)}
+                      </select>
+                      <p className="text-[10px] text-gray-400 mt-1">Demande + facture de {opt.price}€ envoyées à la société, à confirmer de son côté.</p>
+                    </div>
+                  )}
+
                   {form.options[opt.id] && opt.hasSub && (
                     <div className="mt-2" onClick={e => e.stopPropagation()}>
                       {opt.id === 'skipper' && (
-                        <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" value={form.skipperName} onChange={e => set('skipperName', e.target.value)}>
-                          {SKIPPERS.map(s => <option key={s.id}>{s.name} — {s.rate}€/j</option>)}
-                          <option>Skipper externe (hors app)</option>
-                        </select>
+                        <div>
+                          <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" value={form.skipperId} onChange={e => set('skipperId', e.target.value)}>
+                            <option value="">Choisir plus tard</option>
+                            {SKIPPERS.map(s => <option key={s.id} value={s.id}>{s.name} — {s.rate}€/j</option>)}
+                          </select>
+                          <p className="text-[10px] text-gray-400 mt-1">{form.skipperId ? 'Une demande lui sera envoyée ; il est affecté dès qu\'il accepte.' : 'Tu pourras le choisir depuis la fiche de la location.'}</p>
+                        </div>
                       )}
                       {opt.id === 'draps' && (
                         <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" value={form.cabines} onChange={e => set('cabines', e.target.value)}>
@@ -586,6 +610,18 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
                 <p className="text-xs text-gray-400 mb-4">Aucune option sélectionnée</p>
               )}
 
+              {form.options.menage && (
+                <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 rounded-lg p-3 text-xs text-navy-700 mb-3">
+                  <Check size={13} className="flex-shrink-0 text-navy-600" />
+                  Ménage : demande et facture envoyées à {MENAGE_PROVIDERS.find(p => p.id === form.menageProviderId)?.company}. Il entre dans son planning dès qu'elle accepte.
+                </div>
+              )}
+              {form.options.skipper && form.skipperId && (
+                <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 rounded-lg p-3 text-xs text-navy-700 mb-3">
+                  <Check size={13} className="flex-shrink-0 text-navy-600" />
+                  Skipper : demande envoyée à {SKIPPERS.find(s => s.id === form.skipperId)?.name}. Affecté dès qu'il accepte.
+                </div>
+              )}
               {(parseFloat(form.basePrice) > 0 || optionsTotal > 0) && (
                 <div className="flex items-center justify-between bg-navy-900 rounded-xl p-4 mb-4">
                   <span className="text-sm font-medium text-white">Total général</span>
@@ -597,7 +633,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
 
               <div className="flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-lg p-3 text-sm text-teal-800">
                 <Check size={14} className="flex-shrink-0 text-teal-600" />
-                Apparaîtra immédiatement dans le planning une fois confirmée.
+                Apparaîtra immédiatement dans le planning, la fiche client et les missions techniciens.
               </div>
             </div>
           )}

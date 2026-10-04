@@ -73,6 +73,8 @@ function buildChecklist(boat, booking) {
       { id: 'n2', label: 'Fenders', max: 8 },
       { id: 'n3', label: 'Aussières', max: 6 },
       { id: 'n4', label: 'Gaffe', max: 1 },
+      { id: 'n5', label: 'Annexe (gonflée, sans fuite)', max: 1 },
+      { id: 'n6', label: 'Moteur hors-bord annexe', max: 1 },
     ],
   })
 

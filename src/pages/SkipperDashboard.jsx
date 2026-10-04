@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import React from 'react'
 import { ChevronLeft, ChevronRight, X, Check, Send, LogOut } from 'lucide-react'
 import { SkipperSidebar } from '@/components/layout/SkipperLayout'
+import { getRequestsForSkipper, respondSkipperRequest, subscribeSkipperRequests } from '@/lib/skipper-requests'
+import { getThread, sendMessage as storeSend, subscribeMessages, markRead, getUnread } from '@/lib/messaging'
+
+// Le skipper connecté en démo = Jean-Marc Rossi (skip-1 dans les données).
+const SKIPPER_ID = 'skip-1'
 
 const SKIPPER = { name: 'Jean-Marc Rossi', initials: 'JM', location: 'Marseille', rate: 180, rating: 4.9, missions: 38 }
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const MONTHS_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 
-const ALL_MISSIONS = [
+const BASE_MISSIONS = [
   { id:'m1', boat:'Dufour 360', agency:'Midi Nautisme', agencyColor:'#185FA5', start:'2026-07-05', end:'2026-07-12', days:7, amount:1260, status:'confirmed', client:'Moreau J.' },
   { id:'m2', boat:'Elba 45', agency:'Midi Nautisme', agencyColor:'#185FA5', start:'2026-07-19', end:'2026-07-26', days:7, amount:1260, status:'option', client:'Faure C.' },
   { id:'m3', boat:'Dufour 360', agency:'Midi Nautisme', agencyColor:'#185FA5', start:'2026-06-14', end:'2026-06-21', days:7, amount:1260, status:'done', paid:true, client:'Dupont M.' },
@@ -15,6 +20,43 @@ const ALL_MISSIONS = [
   { id:'m5', boat:'BSC 65', agency:'Locamotors', agencyColor:'#1D9E75', start:'2026-05-30', end:'2026-06-06', days:7, amount:1080, status:'done', paid:false, client:'Bernard L.' },
   { id:'m6', boat:'Dufour 390', agency:'Midi Nautisme', agencyColor:'#185FA5', start:'2026-04-12', end:'2026-04-15', days:3, amount:540, status:'done', paid:true, client:'Petit R.' },
 ]
+
+// Missions = historique + missions acceptées depuis les demandes de l'agence (vraies locations).
+function getAllMissions() {
+  const accepted = getRequestsForSkipper(SKIPPER_ID, 'acceptee').map(r => {
+    const b = r.booking
+    const days = Math.max(1, Math.round((new Date(b.end) - new Date(b.start)) / 86400000))
+    return { id: 'req-' + b.id, boat: b.boatName.split('—')[0].trim(), agency: 'Midi Nautisme', agencyColor: '#185FA5', start: b.start, end: b.end, days, amount: days * SKIPPER.rate, status: 'confirmed', client: b.client }
+  })
+  return [...BASE_MISSIONS, ...accepted]
+}
+
+// Demandes de mission en attente : accepter → affecté à la location côté agence.
+function DemandesEnAttente() {
+  const pending = getRequestsForSkipper(SKIPPER_ID, 'en_attente')
+  if (pending.length === 0) return null
+  const fmt = d => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return (
+    <div className="px-5 pt-4">
+      <p className="section-label">Demandes de mission ({pending.length})</p>
+      <div className="flex flex-col gap-2">
+        {pending.map(r => {
+          const days = Math.max(1, Math.round((new Date(r.booking.end) - new Date(r.booking.start)) / 86400000))
+          return (
+            <div key={r.booking.id} className="card flex items-center gap-3" style={{ borderColor: '#FAC775', background: '#FFFBF3' }}>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{r.booking.boatName}</p>
+                <p className="text-xs text-gray-500">Midi Nautisme · {fmt(r.booking.start)} → {fmt(r.booking.end)} · {r.booking.guests} · {days * SKIPPER.rate}€</p>
+              </div>
+              <button className="btn-ghost text-xs py-1.5" onClick={() => respondSkipperRequest(r.booking.id, false)}><X size={12} /> Refuser</button>
+              <button className="btn-primary text-xs py-1.5" onClick={() => respondSkipperRequest(r.booking.id, true)}><Check size={12} /> Accepter</button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 const CONTACTS = [
   { name:'Midi Nautisme', contact:'Sophie Durand', phone:'04 91 54 86 09', email:'info@midinautisme.fr', missions:28, color:'#185FA5' },
@@ -37,7 +79,7 @@ function PlanningMois({ onSelect }) {
 
   function fmt(d) { return d.toISOString().split('T')[0] }
   function getMissionsForDay(dayStr) {
-    return ALL_MISSIONS.filter(m => dayStr >= m.start && dayStr <= m.end)
+    return getAllMissions().filter(m => dayStr >= m.start && dayStr <= m.end)
   }
 
   return (
@@ -175,7 +217,7 @@ function MissionDetail({ mission, onClose }) {
 function Revenus({ onSelect }) {
   const [selMonth, setSelMonth] = useState(5)
   const year = 2026
-  const done = ALL_MISSIONS.filter(m=>m.status==='done')
+  const done = getAllMissions().filter(m=>m.status==='done')
   const totalYear = done.reduce((a,m)=>a+m.amount,0)
   const totalPaid = done.filter(m=>m.paid).reduce((a,m)=>a+m.amount,0)
   const monthly = MONTHS_SHORT.map((_,i)=>done.filter(m=>new Date(m.start).getMonth()===i).reduce((a,m)=>a+m.amount,0))
@@ -284,20 +326,24 @@ function Dispos() {
 function MessagerieSkipper() {
   const [active, setActive] = useState(0)
   const [input, setInput] = useState('')
-  const [convs, setConvs] = useState([
-    { name:'Midi Nautisme', initials:'MN', msgs:[
-      {from:'agency',text:'Bonjour Jean-Marc, disponible le 5 juillet ?',time:'09:15'},
-      {from:'skipper',text:'Oui, je confirme. Je serai au quai à 8h30.',time:'09:41'},
-    ]},
+  const [, refresh] = useState(0)
+  useEffect(() => subscribeMessages(() => refresh(v => v + 1)), [])
+  // Fil Midi Nautisme = le même que dans la messagerie de l'agence (src/lib/messaging.js).
+  const [otherConvs, setOtherConvs] = useState([
     { name:'Azur Loc Voile', initials:'AL', msgs:[
       {from:'agency',text:'Avez-vous de la dispo mi-juillet ?',time:'Hier'},
     ]},
   ])
+  const convs = [{ name:'Midi Nautisme', initials:'MN', shared:true, msgs:getThread(SKIPPER_ID).map(m=>({from:m.from,text:m.text,time:m.time})) }, ...otherConvs]
+  useEffect(() => { if (active === 0 && getUnread('skipper', SKIPPER_ID) > 0) markRead('skipper', SKIPPER_ID) })
 
   function send() {
     if(!input.trim()) return
-    const time = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
-    setConvs(prev=>prev.map((c,i)=>i===active?{...c,msgs:[...c.msgs,{from:'skipper',text:input.trim(),time}]}:c))
+    if (active === 0) storeSend(SKIPPER_ID, 'skipper', input)
+    else {
+      const time = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+      setOtherConvs(prev=>prev.map((c,i)=>i===active-1?{...c,msgs:[...c.msgs,{from:'skipper',text:input.trim(),time}]}:c))
+    }
     setInput('')
   }
 
@@ -323,7 +369,7 @@ function MessagerieSkipper() {
           {convs[active]?.msgs.map((m,i)=>(
             <div key={i} className={`flex ${m.from==='skipper'?'justify-end':'justify-start'}`}>
               <div className={`max-w-xs rounded-2xl px-3 py-2 ${m.from==='skipper'?'bg-navy-600 text-white rounded-tr-sm':'bg-gray-100 text-gray-800 rounded-tl-sm'}`}>
-                <p className="text-sm">{m.text}</p>
+                <p className="text-sm whitespace-pre-line">{m.text}</p>
                 <p className={`text-[10px] mt-1 ${m.from==='skipper'?'text-navy-200':'text-gray-400'}`}>{m.time}</p>
               </div>
             </div>
@@ -342,7 +388,11 @@ function MessagerieSkipper() {
 export default function SkipperDashboard({ onLogout }) {
   const [tab, setTab] = useState('planning')
   const [selectedMission, setSelectedMission] = useState(null)
-  const future = ALL_MISSIONS.filter(m=>m.status==='confirmed'||m.status==='option')
+  const [, refresh] = useState(0)
+  useEffect(() => subscribeSkipperRequests(() => refresh(v => v + 1)), [])
+  useEffect(() => subscribeMessages(() => refresh(v => v + 1)), [])
+  const ALL_MISSIONS = getAllMissions()
+  const future = ALL_MISSIONS.filter(m=>m.status==='confirmed'||m.status==='option').sort((a,b)=>a.start.localeCompare(b.start))
   const past = ALL_MISSIONS.filter(m=>m.status==='done')
   const [mView, setMView] = useState('future')
 
@@ -351,7 +401,7 @@ export default function SkipperDashboard({ onLogout }) {
       <SkipperSidebar skipper={SKIPPER} onLogout={onLogout} activeTab={tab} setTab={setTab}/>
       <main className="flex-1 flex flex-col overflow-hidden">
 
-        {tab==='planning' && <PlanningMois onSelect={setSelectedMission}/>}
+        {tab==='planning' && <div className="flex flex-col h-full overflow-hidden"><DemandesEnAttente/><div className="flex-1 overflow-hidden"><PlanningMois onSelect={setSelectedMission}/></div></div>}
 
         {tab==='missions' && (
           <div className="flex flex-col h-full overflow-hidden">
@@ -363,6 +413,7 @@ export default function SkipperDashboard({ onLogout }) {
                 ))}
               </div>
             </div>
+            {mView==='future' && <DemandesEnAttente/>}
             <div className="flex-1 overflow-auto p-5 flex flex-col gap-3">
               {(mView==='future'?future:past).map(m=>{
                 const s=STATUS_STYLE[m.status]||STATUS_STYLE.done

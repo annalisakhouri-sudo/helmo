@@ -8,6 +8,9 @@ import ContractModal from './ContractModal'
 import InvoiceModal from './InvoiceModal'
 import { getState, subscribe, completeCheckIn, getMaintenanceTasks } from '@/lib/shared-state'
 import { buildChecklist } from './MaintenanceModal'
+import SkipperPickerModal from '@/components/skippers/SkipperPickerModal'
+import { getRequest, subscribeSkipperRequests, respondSkipperRequest, cancelSkipperRequest } from '@/lib/skipper-requests'
+import { SKIPPERS } from '@/lib/mock-data'
 
 const DOC_ICONS = { francisation: FileText, assurance: Shield, securite: Anchor, jauge: Anchor }
 const DOC_NAMES = { francisation: 'Francisation', assurance: 'Assurance', securite: 'Carnet sécurité', jauge: 'Jauge' }
@@ -21,9 +24,18 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
   const [sharedState, setSharedState] = useState(getState())
   const [, forceUpdate] = useState(0) // force le re-render local après mutation directe de booking
   
+  const [showSkipperPicker, setShowSkipperPicker] = useState(false)
   React.useEffect(() => {
     return subscribe(state => setSharedState(state))
   }, [])
+  // Demande skipper en cours : quand le skipper répond, la fiche (et le planning) se mettent à jour.
+  React.useEffect(() => subscribeSkipperRequests(() => {
+    forceUpdate(v => v + 1)
+    onBookingChange && onBookingChange(booking)
+  }), [])
+  const skipperRequest = getRequest(booking.id)
+  const pendingSkipper = skipperRequest?.status === 'en_attente' ? SKIPPERS.find(s => s.id === skipperRequest.skipperId) : null
+  const refusedSkipper = skipperRequest?.status === 'refusee' ? SKIPPERS.find(s => s.id === skipperRequest.skipperId) : null
   const checkInDone = !!sharedState.checkIns[booking.id]?.done
 
   function setClientAsSkipper() {
@@ -128,10 +140,10 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                         <p className="text-sm font-medium">{booking.skipperName}</p>
                         {booking.clientIsSkipper
                           ? <span className="text-[10px] text-navy-500">Client navigue lui-même</span>
-                          : <p className="text-[10px] text-gray-400">{booking.phone}</p>
+                          : <p className="text-[10px] text-gray-400">{booking.skipperPhone || booking.phone}</p>
                         }
                       </div>
-                      <span className="text-[11px] text-navy-600 cursor-pointer" onClick={onFindSkipper}>Changer →</span>
+                      <span className="text-[11px] text-navy-600 cursor-pointer" onClick={() => setShowSkipperPicker(true)}>Changer →</span>
                     </div>
                     {booking.clientIsSkipper && (
                       <button className="btn-ghost py-1.5 px-3 text-xs w-full justify-center border-amber-300 text-amber-800 mt-2.5" onClick={onViewClientDocs}>
@@ -139,11 +151,27 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
                       </button>
                     )}
                   </div>
+                ) : pendingSkipper ? (
+                  <div className="card-sm border border-navy-100 bg-navy-50">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${pendingSkipper.color}`}>{pendingSkipper.initials}</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{pendingSkipper.name}</p>
+                        <p className="text-[10px] text-navy-600">Demande envoyée · en attente de sa réponse</p>
+                      </div>
+                      <span className="text-[11px] text-gray-500 cursor-pointer hover:text-danger-600" onClick={() => cancelSkipperRequest(booking.id)}>Annuler</span>
+                    </div>
+                    <div className="mt-2.5 pt-2.5 border-t border-navy-100 flex items-center gap-2">
+                      <p className="text-[10px] text-gray-400 flex-1">Démo : simuler la réponse du skipper</p>
+                      <button className="text-[10px] font-medium px-2 py-1 rounded-full bg-teal-50 text-teal-700 hover:bg-teal-100" onClick={() => respondSkipperRequest(booking.id, true)}>Il accepte</button>
+                      <button className="text-[10px] font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200" onClick={() => respondSkipperRequest(booking.id, false)}>Il refuse</button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="card-sm border border-dashed border-amber-200">
-                    <p className="text-xs text-amber-800 mb-2">Aucun skipper assigné</p>
+                    <p className="text-xs text-amber-800 mb-2">{refusedSkipper ? `${refusedSkipper.name} a refusé — choisis un autre skipper` : 'Aucun skipper assigné'}</p>
                     <div className="flex gap-2">
-                      <button className="btn-primary py-1.5 px-3 text-xs flex-1 justify-center" onClick={onFindSkipper}>
+                      <button className="btn-primary py-1.5 px-3 text-xs flex-1 justify-center" onClick={() => setShowSkipperPicker(true)}>
                         <Users size={12} /> Trouver un skipper
                       </button>
                       <button className="btn-ghost py-1.5 px-3 text-xs flex-1 justify-center" onClick={setClientAsSkipper}>
@@ -351,6 +379,10 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
 
       {showInvoice && (
         <InvoiceModal booking={booking} onClose={() => setShowInvoice(false)} />
+      )}
+
+      {showSkipperPicker && (
+        <SkipperPickerModal booking={booking} onClose={() => setShowSkipperPicker(false)} />
       )}
     </>
   )

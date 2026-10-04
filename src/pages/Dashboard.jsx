@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { AlertTriangle, Plus, ChevronRight, ArrowUpRight, ArrowDownLeft, Euro } from 'lucide-react'
-import { parseISO, addDays, format, isWithinInterval } from 'date-fns'
+import { parseISO, addDays, format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BOATS, BOOKINGS, DOC_LABELS, CLIENTS } from '@/lib/mock-data'
 import WeekendRotation from '@/components/dashboard/WeekendRotation'
@@ -72,12 +72,19 @@ function MovementRow({ booking, date, type, onSelect }) {
 }
 
 // ── Liste compacte des mouvements (départs/retours) d'une semaine, séparés ──
+// Une semaine de rotation = du samedi (inclus) au samedi suivant (EXCLU).
+// Sinon le samedi de fin est compté deux fois : dans cette semaine et dans la suivante.
+function inWeek(dateStr, weekStart, weekEnd) {
+  const d = parseISO(dateStr)
+  return d >= weekStart && d < weekEnd
+}
+
 function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect }) {
   const departs = bookings
-    .filter(b => { try { return isWithinInterval(parseISO(b.start), { start: weekStart, end: weekEnd }) } catch { return false } })
+    .filter(b => { try { return inWeek(b.start, weekStart, weekEnd) } catch { return false } })
     .sort((a, b) => a.start.localeCompare(b.start))
   const retours = bookings
-    .filter(b => { try { return isWithinInterval(parseISO(b.end), { start: weekStart, end: weekEnd }) } catch { return false } })
+    .filter(b => { try { return inWeek(b.end, weekStart, weekEnd) } catch { return false } })
     .sort((a, b) => a.end.localeCompare(b.end))
 
   return (
@@ -146,10 +153,10 @@ export default function Dashboard() {
   const nextWeekEnd = addDays(nextWeekStart, 7)
 
   const departs = bookings.filter(b => {
-    try { return isWithinInterval(parseISO(b.start), { start: currentWeekStart, end: currentWeekEnd }) } catch { return false }
+    try { return inWeek(b.start, currentWeekStart, currentWeekEnd) } catch { return false }
   })
   const retours = bookings.filter(b => {
-    try { return isWithinInterval(parseISO(b.end), { start: currentWeekStart, end: currentWeekEnd }) } catch { return false }
+    try { return inWeek(b.end, currentWeekStart, currentWeekEnd) } catch { return false }
   })
 
   // Toutes les locs actives cette semaine (départ OU en cours OU retour)

@@ -3,8 +3,8 @@ import { X, LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Printer, Receipt,
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
-import { getMissionsForProvider, getProviderByAccessCode, groupMissionsByAgency, doneByLabel, paidLabel } from '@/lib/menage-missions'
-import { getState, subscribe, toggleMenageDone } from '@/lib/shared-state'
+import { getMissionsForProvider, getPendingRequestsForProvider, getProviderByAccessCode, groupMissionsByAgency, doneByLabel, paidLabel } from '@/lib/menage-missions'
+import { getState, subscribe, toggleMenageDone, respondMenageRequest } from '@/lib/shared-state'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
 const STATUS_PILL = {
@@ -103,6 +103,7 @@ export default function MenageDashboard({ onLogout }) {
 
   const provider = MENAGE_PROVIDERS.find(p => p.id === providerId)
   const missions = getMissionsForProvider(providerId)
+  const pendingRequests = getPendingRequestsForProvider(providerId)
   const done = missions.filter(m => m.done).length
   const pct = missions.length ? Math.round((done / missions.length) * 100) : 0
   const agencyGroups = groupMissionsByAgency(missions)
@@ -200,6 +201,32 @@ export default function MenageDashboard({ onLogout }) {
             <button className="btn-ghost text-xs" onClick={() => window.print()}><Printer size={13} /> Imprimer</button>
           </div>
         </div>
+
+        {view === 'planning' && pendingRequests.length > 0 && (
+          <div className="px-6 pt-5 max-w-2xl print:hidden">
+            <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-2">Nouvelles demandes à confirmer ({pendingRequests.length})</p>
+            <div className="flex flex-col gap-2">
+              {pendingRequests.map(m => (
+                <div key={m.key} className="rounded-xl border p-3.5" style={{ borderColor: '#FAC775', background: '#FFFBF3' }}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{m.boat}</p>
+                      <p className="text-xs text-gray-500">{m.agencyName} · {format(parseISO(m.date), 'EEEE d MMM', { locale: fr })} · {m.heure} · {m.client}</p>
+                    </div>
+                    <p className="text-sm font-bold text-navy-900 flex-shrink-0">{m.amount}€</p>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button className="text-[11px] font-medium text-navy-600 bg-white border border-navy-100 px-2.5 py-1 rounded-full flex items-center gap-1" onClick={() => setInvoiceMission(m)}>
+                      <Receipt size={11} /> Voir la facture
+                    </button>
+                    <button className="btn-ghost text-xs py-1 ml-auto" onClick={() => respondMenageRequest(m.bookingId, false)}><X size={12} /> Refuser</button>
+                    <button className="btn-primary text-xs py-1" onClick={() => respondMenageRequest(m.bookingId, true)}><Check size={12} /> Accepter</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {view === 'planning' && missions.length > 0 && (
           <div className="grid grid-cols-3 gap-3 px-6 pt-5 max-w-2xl print:hidden">

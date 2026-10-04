@@ -1,78 +1,41 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Search, X, MoreVertical, Archive, CheckCheck, RotateCcw, ArchiveRestore } from 'lucide-react'
 import { SKIPPERS } from '@/lib/mock-data'
+import { getThread, getThreadSkipperIds, sendMessage as storeSend, subscribeMessages, getUnread, markRead, markUnread } from '@/lib/messaging'
 
-const TODAY_LABEL = "Aujourd'hui"
 
-const INITIAL_CONVERSATIONS = [
-  {
-    id: 'conv-1',
-    skipper: SKIPPERS[0],
-    closed: false,
-    archived: false,
-    messages: [
-      { id: 'm1', from: 'agency', text: 'Bonjour Jean-Marc, êtes-vous disponible le 5 juillet pour le Dufour 360 ?', time: '09:15', date: '4 juillet' },
-      { id: 'm2', from: 'skipper', text: 'Bonjour ! Oui je suis disponible ce jour-là. C\'est pour combien de jours ?', time: '09:32', date: '4 juillet' },
-      { id: 'm3', from: 'agency', text: 'Une semaine, du 5 au 12 juillet. Tarif habituel 180€/j.', time: '09:35', date: '4 juillet' },
-      { id: 'm4', from: 'skipper', text: 'Parfait, je confirme. Je serai au quai à 8h30 le samedi 5.', time: '09:41', date: "Aujourd'hui" },
-    ],
-    lastMsg: 'Parfait, je confirme.',
-    lastTime: '09:41',
-    unread: 0,
-  },
-  {
-    id: 'conv-2',
-    skipper: SKIPPERS[1],
-    closed: false,
-    archived: false,
-    messages: [
-      { id: 'm5', from: 'agency', text: 'Sophie, avez-vous de la dispo pour l\'Elba 45 semaine du 5 juillet ?', time: '10:00', date: "Aujourd'hui" },
-      { id: 'm6', from: 'skipper', text: 'Oui bien sûr ! Vous avez besoin de moi pour toute la semaine ?', time: '10:15', date: "Aujourd'hui" },
-    ],
-    lastMsg: 'Oui bien sûr !',
-    lastTime: '10:15',
-    unread: 1,
-  },
-  {
-    id: 'conv-3',
-    skipper: SKIPPERS[2],
-    closed: false,
-    archived: false,
-    messages: [
-      { id: 'm7', from: 'agency', text: 'Thomas, avez-vous de la dispo mi-juillet ?', time: '14:20', date: '2 jours' },
-    ],
-    lastMsg: 'Thomas, avez-vous de la dispo...',
-    lastTime: '2j',
-    unread: 0,
-    daysSinceLastReply: 2,
-  },
-]
+// Les messages viennent de la messagerie partagée (src/lib/messaging.js) : le skipper les voit
+// dans son espace, et ses réponses (ou son acceptation d'une mission) arrivent ici.
+// Ici on ne garde que l'état d'affichage : conversation clôturée / archivée.
+const convFor = skipper => ({ id: 'conv-' + skipper.id, skipper, closed: false, archived: false })
 
 export default function Messagerie({ initialSkipper, onClose }) {
-  const [convs, setConvs] = useState(() => {
-    if (initialSkipper) {
-      const exists = INITIAL_CONVERSATIONS.find(c => c.skipper.id === initialSkipper.id)
-      if (!exists) {
-        return [...INITIAL_CONVERSATIONS, {
-          id: 'conv-new-' + Date.now(),
-          skipper: initialSkipper,
-          closed: false, archived: false,
-          messages: [],
-          lastMsg: 'Nouvelle conversation',
-          lastTime: 'Maintenant',
-          unread: 0,
-        }]
-      }
+  const [convFlags, setConvFlags] = useState({}) // convId -> { closed, archived }
+  const [, refresh] = useState(0)
+  useEffect(() => subscribeMessages(() => refresh(v => v + 1)), [])
+
+  const threadIds = getThreadSkipperIds()
+  const skipperList = [
+    ...SKIPPERS.filter(sk => threadIds.includes(sk.id)),
+    ...(initialSkipper && !threadIds.includes(initialSkipper.id) ? [initialSkipper] : []),
+  ]
+  const convs = skipperList.map(sk => {
+    const messages = getThread(sk.id)
+    const last = messages[messages.length - 1]
+    return {
+      ...convFor(sk),
+      ...convFlags['conv-' + sk.id],
+      messages,
+      lastMsg: last ? last.text : 'Nouvelle conversation',
+      lastTime: last ? last.time : 'Maintenant',
+      unread: getUnread('agency', sk.id),
+      // Relance proposée si notre dernier message date d'avant aujourd'hui sans réponse.
+      daysSinceLastReply: last && last.from === 'agency' && last.date !== "Aujourd'hui" ? 2 : 0,
     }
-    return INITIAL_CONVERSATIONS
   })
-  const [activeId, setActiveId] = useState(() => {
-    if (initialSkipper) {
-      const exists = INITIAL_CONVERSATIONS.find(c => c.skipper.id === initialSkipper.id)
-      return exists ? exists.id : 'conv-new-' + Date.now()
-    }
-    return 'conv-1'
-  })
+  const setFlag = (id, patch) => setConvFlags(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }))
+
+  const [activeId, setActiveId] = useState(() => 'conv-' + (initialSkipper?.id || threadIds[0]))
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
   const [showMenu, setShowMenu] = useState(false)
@@ -83,34 +46,39 @@ export default function Messagerie({ initialSkipper, onClose }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activeId, convs])
+  }, [activeId, active?.messages.length])
+
+  // Conversation ouverte = messages lus.
+  useEffect(() => {
+    if (active && active.unread > 0) markRead('agency', active.skipper.id)
+  }, [activeId, active?.unread])
 
   function sendMessage() {
     if (!input.trim() || !active) return
-    const msg = { id: 'm-' + Date.now(), from: 'agency', text: input.trim(), time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), date: TODAY_LABEL }
-    setConvs(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, msg], lastMsg: input.trim(), lastTime: msg.time, daysSinceLastReply: 0 } : c))
+    storeSend(active.skipper.id, 'agency', input)
     setInput('')
   }
 
   function toggleUnread() {
-    setConvs(prev => prev.map(c => c.id === activeId ? { ...c, unread: c.unread > 0 ? 0 : 1 } : c))
+    if (!active) return
+    if (active.unread > 0) markRead('agency', active.skipper.id)
+    else markUnread('agency', active.skipper.id)
   }
 
   function toggleClosed() {
-    setConvs(prev => prev.map(c => c.id === activeId ? { ...c, closed: !c.closed } : c))
+    setFlag(activeId, { closed: !active?.closed })
     setShowMenu(false)
   }
 
   function toggleArchived() {
-    setConvs(prev => prev.map(c => c.id === activeId ? { ...c, archived: !c.archived } : c))
+    setFlag(activeId, { archived: !active?.archived })
     setShowMenu(false)
     setActiveId(null)
   }
 
   function relancer() {
     if (!active) return
-    const relance = { id: 'm-' + Date.now(), from: 'agency', text: `Bonjour ${active.skipper.name.split(' ')[0]}, je me permets de relancer ma demande précédente, avez-vous pu y réfléchir ?`, time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), date: TODAY_LABEL }
-    setConvs(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, relance], lastMsg: relance.text, lastTime: relance.time, daysSinceLastReply: 0 } : c))
+    storeSend(active.skipper.id, 'agency', `Bonjour ${active.skipper.name.split(' ')[0]}, je me permets de relancer ma demande précédente, avez-vous pu y réfléchir ?`)
   }
 
   // Recherche sur le nom du contact ET le contenu des messages
@@ -167,7 +135,7 @@ export default function Messagerie({ initialSkipper, onClose }) {
             <div
               key={conv.id}
               className={`flex items-center gap-2.5 px-3 py-3 cursor-pointer border-b border-gray-100 transition-colors ${activeId === conv.id ? 'bg-navy-50 border-l-2 border-l-navy-600' : 'hover:bg-white'}`}
-              onClick={() => { setActiveId(conv.id); setConvs(prev => prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c)) }}
+              onClick={() => { setActiveId(conv.id); markRead('agency', conv.skipper.id) }}
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${conv.skipper.color}`}>
                 {conv.skipper.initials}
@@ -256,7 +224,7 @@ export default function Messagerie({ initialSkipper, onClose }) {
                       </div>
                     )}
                     <div className={`max-w-xs rounded-2xl px-3 py-2 ${item.from === 'agency' ? 'bg-navy-600 text-white rounded-tr-sm' : 'bg-gray-100 text-gray-800 rounded-tl-sm'}`}>
-                      <p className="text-sm leading-relaxed">{item.text}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-line">{item.text}</p>
                       <p className={`text-[10px] mt-1 ${item.from === 'agency' ? 'text-navy-200' : 'text-gray-400'}`}>{item.time}</p>
                     </div>
                   </div>

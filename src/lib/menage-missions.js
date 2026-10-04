@@ -31,6 +31,7 @@ export function buildAllMenageMissions() {
   const done = st.menageDone || {}
   const doneMeta = st.menageDoneMeta || {}
   const invoices = st.menageInvoices || {}
+  const requests = st.menageRequests || {}
   const missions = []
 
   BOOKINGS.forEach(b => {
@@ -39,7 +40,9 @@ export function buildAllMenageMissions() {
     if (!b.options?.menage) return
     const boat = BOATS.find(bt => bt.id === b.boatId)
     if (!boat) return
-    const provider = getDefaultMenageForBoat(b.boatId)
+    // Société choisie à la création de la loc (demande envoyée), sinon celle assignée au bateau.
+    const request = requests[b.id]
+    const provider = MENAGE_PROVIDERS.find(p => p.id === (request?.providerId || b.menageProviderId)) || getDefaultMenageForBoat(b.boatId)
     if (!provider) return
 
     const hasLastNight = b.lastNightAboard !== false
@@ -58,6 +61,9 @@ export function buildAllMenageMissions() {
       id: key,
       key,
       providerId: provider.id,
+      providerName: provider.company,
+      // 'a_confirmer' → la société doit accepter (facture jointe) ; 'refusee' → l'agence en choisit une autre.
+      requestStatus: request ? request.status : 'acceptee',
       date,
       weekStart: format(getSaturdayOnOrBefore(parseISO(date)), 'yyyy-MM-dd'),
       boatId: boat.id,
@@ -85,8 +91,19 @@ export function buildAllMenageMissions() {
   return missions
 }
 
+// Planning d'une société = uniquement les ménages qu'elle a ACCEPTÉS.
 export function getMissionsForProvider(providerId) {
-  return buildAllMenageMissions().filter(m => m.providerId === providerId)
+  return buildAllMenageMissions().filter(m => m.providerId === providerId && m.requestStatus === 'acceptee')
+}
+
+// Demandes reçues par une société, en attente de sa réponse.
+export function getPendingRequestsForProvider(providerId) {
+  return buildAllMenageMissions().filter(m => m.providerId === providerId && m.requestStatus === 'a_confirmer')
+}
+
+// Côté agence : ménages pas encore confirmés (en attente ou refusés).
+export function getUnconfirmedMenages(brand) {
+  return buildAllMenageMissions().filter(m => m.requestStatus !== 'acceptee' && (!brand || m.agencyBrand === brand))
 }
 
 // Connexion par code d'accès (donné par l'agence) plutôt que par sélection dans une liste.
@@ -147,7 +164,9 @@ export function getMenageForTechMission(type, booking) {
       .sort((a, b) => b.end.localeCompare(a.end))[0]
   }
   if (!source || !source.options?.menage) return null
-  const provider = getDefaultMenageForBoat(source.boatId)
+  const req = getState().menageRequests?.[source.id]
+  if (req && req.status !== 'acceptee') return null // pas encore confirmé par une société → le technicien garde le nettoyage
+  const provider = MENAGE_PROVIDERS.find(p => p.id === (req?.providerId || source.menageProviderId)) || getDefaultMenageForBoat(source.boatId)
   if (!provider) return null
   return { key: `menage-${source.id}`, providerName: provider.company }
 }

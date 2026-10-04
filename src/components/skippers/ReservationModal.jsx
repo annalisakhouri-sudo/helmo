@@ -1,47 +1,35 @@
 import { useState } from 'react'
 import { X, Check, Send, CalendarPlus } from 'lucide-react'
 import { BOATS } from '@/lib/mock-data'
+import { getBookingsNeedingSkipper, isSkipperFree, buildRequestMessage, sendSkipperRequest } from '@/lib/skipper-requests'
 
-function generateMessage(skipper, form, boat) {
-  if (!form.dateStart || !form.dateEnd || !boat) return ''
-  const start = new Date(form.dateStart).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-  const end = new Date(form.dateEnd).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-  const days = Math.ceil((new Date(form.dateEnd) - new Date(form.dateStart)) / (1000 * 60 * 60 * 24))
-  return `Bonjour ${skipper.name.split(' ')[0]},\n\nNous souhaiterions vous réserver pour une mission sur le ${boat.name} du ${start} au ${end} (${days} jour${days > 1 ? 's' : ''}), pour ${form.guests} au départ du ${boat.port}.\n\nTarif convenu : ${skipper.rate}€/j${form.notes ? `\n\nNotes : ${form.notes}` : ''}\n\nPouvez-vous confirmer votre disponibilité ?\n\nCordialement,\nMidi Nautisme`
-}
+const fmt = d => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-export default function ReservationModal({ skipper, onClose, onSend }) {
+// Réserver un skipper depuis sa fiche : on choisit la LOCATION concernée (celles qui attendent
+// un skipper), la demande part et le skipper est affecté dès qu'il accepte.
+export default function ReservationModal({ skipper, onClose }) {
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
-  const [form, setForm] = useState({ boatId: '', dateStart: '', dateEnd: '', guests: '4 personnes', notes: '' })
-  const [errors, setErrors] = useState({})
+  const [bookingId, setBookingId] = useState('')
+  const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  const availableBoats = BOATS.filter(b => skipper.boats.some(bt => b.type.includes(bt)))
+  const options = getBookingsNeedingSkipper()
+    .filter(b => { const boat = BOATS.find(x => x.id === b.boatId); return !boat || skipper.boats.some(t => boat.type.includes(t)) })
+    .map(b => ({ ...b, free: isSkipperFree(skipper.id, b) }))
+  const booking = options.find(b => b.id === bookingId)
 
-  function set(k, v) {
-    const next = { ...form, [k]: v }
-    setForm(next)
-    if (errors[k]) setErrors(e => ({ ...e, [k]: '' }))
-    const boat = BOATS.find(b => b.id === next.boatId)
-    if (next.dateStart && next.dateEnd && boat) setMessage(generateMessage(skipper, next, boat))
+  function next() {
+    if (!booking) { setError('Choisis la location concernée'); return }
+    if (!booking.free) { setError(`${skipper.name.split(' ')[0]} est déjà pris sur ces dates`); return }
+    setMessage(buildRequestMessage(skipper, booking))
+    setStep(2)
   }
 
-  function validate() {
-    const e = {}
-    if (!form.boatId) e.boatId = 'Sélectionne un bateau'
-    if (!form.dateStart) e.dateStart = 'Date requise'
-    if (!form.dateEnd) e.dateEnd = 'Date requise'
-    else if (form.dateEnd <= form.dateStart) e.dateEnd = 'Doit être après le début'
-    setErrors(e)
-    if (!Object.keys(e).length) {
-      const boat = BOATS.find(b => b.id === form.boatId)
-      setMessage(generateMessage(skipper, form, boat))
-      setStep(2)
-    }
+  function send() {
+    sendSkipperRequest(booking, skipper.id, message)
+    setDone(true)
   }
-
-  const inp = (k) => `w-full text-sm px-3 py-2 border rounded-lg bg-white transition-colors ${errors[k] ? 'border-danger-400 bg-danger-50' : 'border-gray-200 focus:border-navy-600 focus:outline-none'}`
 
   if (done) return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60] p-6">
@@ -50,7 +38,7 @@ export default function ReservationModal({ skipper, onClose, onSend }) {
           <Check size={32} className="text-teal-400" />
         </div>
         <h2 className="font-display text-xl font-bold mb-2">Demande envoyée !</h2>
-        <p className="text-sm text-gray-400 mb-6">{skipper.name} a reçu votre demande. La mission apparaîtra dans le planning dès confirmation.</p>
+        <p className="text-sm text-gray-400 mb-6">{skipper.name} l'a reçue dans son espace et sa messagerie. Dès qu'il accepte, il est affecté à la location {booking.boatName}.</p>
         <button className="btn-primary w-full justify-center" onClick={onClose}>Fermer</button>
       </div>
     </div>
@@ -71,47 +59,39 @@ export default function ReservationModal({ skipper, onClose, onSend }) {
         </div>
 
         <div className="flex bg-gray-50 border-b border-gray-100 flex-shrink-0">
-          {['Détails mission', 'Message & envoi'].map((s, i) => (
-            <div key={i} className={`flex-1 py-2.5 text-center text-xs transition-colors ${step === i+1 ? 'bg-white text-navy-600 font-medium border-b-2 border-navy-600' : step > i+1 ? 'text-teal-600' : 'text-gray-400'}`}>
-              {step > i+1 && '✓ '}{s}
+          {['Location concernée', 'Message & envoi'].map((s, i) => (
+            <div key={i} className={`flex-1 py-2.5 text-center text-xs transition-colors ${step === i + 1 ? 'bg-white text-navy-600 font-medium border-b-2 border-navy-600' : step > i + 1 ? 'text-teal-600' : 'text-gray-400'}`}>
+              {step > i + 1 && '✓ '}{s}
             </div>
           ))}
         </div>
 
         <div className="flex-1 overflow-auto p-5">
           {step === 1 && (
-            <div>
-              <div className="mb-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Bateau <span className="text-danger-600">*</span></p>
-                <select className={inp('boatId')} value={form.boatId} onChange={e => set('boatId', e.target.value)}>
-                  <option value="">-- Sélectionner un bateau --</option>
-                  {availableBoats.map(b => <option key={b.id} value={b.id}>{b.name} — {b.type} {b.length}m</option>)}
-                </select>
-                {errors.boatId && <p className="text-xs text-danger-600 mt-1">{errors.boatId}</p>}
+            options.length === 0 ? (
+              <div className="bg-gray-50 rounded-xl p-6 text-center">
+                <p className="text-sm text-gray-500 mb-1">Aucune location n'attend de skipper.</p>
+                <p className="text-xs text-gray-400">Quand une location avec l'option skipper n'en a pas encore, elle apparaît ici.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Date début <span className="text-danger-600">*</span></p>
-                  <input type="date" className={inp('dateStart')} value={form.dateStart} onChange={e => set('dateStart', e.target.value)} />
-                  {errors.dateStart && <p className="text-xs text-danger-600 mt-1">{errors.dateStart}</p>}
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Date fin <span className="text-danger-600">*</span></p>
-                  <input type="date" className={inp('dateEnd')} value={form.dateEnd} onChange={e => set('dateEnd', e.target.value)} />
-                  {errors.dateEnd && <p className="text-xs text-danger-600 mt-1">{errors.dateEnd}</p>}
-                </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-gray-400 mb-1">Locations qui attendent un skipper :</p>
+                {options.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => { setBookingId(b.id); setError('') }}
+                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${bookingId === b.id ? 'border-navy-600 bg-navy-50' : 'border-gray-100 hover:bg-gray-50'} ${!b.free ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{b.boatName}</p>
+                      <p className="text-xs text-gray-400">{fmt(b.start)} → {fmt(b.end)} · {b.client} · {b.guests}</p>
+                    </div>
+                    <span className={`text-[10px] font-medium flex-shrink-0 ${b.free ? 'text-teal-600' : 'text-danger-600'}`}>{b.free ? 'Libre' : 'Déjà pris'}</span>
+                  </button>
+                ))}
+                {error && <p className="text-xs text-danger-600 mt-1">{error}</p>}
               </div>
-              <div className="mb-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Personnes à bord</p>
-                <select className={inp('guests')} value={form.guests} onChange={e => set('guests', e.target.value)}>
-                  {[1,2,3,4,5,6,7,8].map(n => <option key={n}>{n} personne{n>1?'s':''}</option>)}
-                </select>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1.5">Notes complémentaires</p>
-                <textarea className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-navy-600" rows={2} placeholder="Ex: client VIP, navigation de nuit prévue..." value={form.notes} onChange={e => set('notes', e.target.value)} />
-              </div>
-            </div>
+            )
           )}
 
           {step === 2 && (
@@ -124,19 +104,14 @@ export default function ReservationModal({ skipper, onClose, onSend }) {
                 value={message}
                 onChange={e => setMessage(e.target.value)}
               />
-              <div className="bg-navy-50 border border-navy-100 rounded-xl p-3 mt-3">
-                <p className="text-xs text-navy-700">
-                  <strong>Récap :</strong> {BOATS.find(b => b.id === form.boatId)?.name} · {form.dateStart} → {form.dateEnd} · {form.guests} · {skipper.rate}€/j
-                </p>
-              </div>
             </div>
           )}
         </div>
 
         <div className="border-t border-gray-100 p-4 flex gap-3 flex-shrink-0">
           {step > 1 && <button className="btn-ghost" onClick={() => setStep(1)}>← Retour</button>}
-          {step === 1 && <button className="btn-primary flex-1 justify-center" onClick={validate}><CalendarPlus size={14} /> Continuer →</button>}
-          {step === 2 && <button className="btn-primary flex-1 justify-center" onClick={() => setDone(true)}><Send size={14} /> Envoyer la demande</button>}
+          {step === 1 && options.length > 0 && <button className="btn-primary flex-1 justify-center" onClick={next}><CalendarPlus size={14} /> Continuer →</button>}
+          {step === 2 && <button className="btn-primary flex-1 justify-center" onClick={send}><Send size={14} /> Envoyer la demande</button>}
         </div>
       </div>
     </div>

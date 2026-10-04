@@ -23,6 +23,10 @@ let state = {
   // menageDoneMeta : missionKey -> { type: 'provider' | 'agency', name, at }
   // Qui a coché « ménage fait » et quand (la société elle-même, ou l'agence en rattrapage).
   menageDoneMeta: {},
+  // menageRequests : bookingId -> { providerId, status: 'a_confirmer' | 'acceptee' | 'refusee', sentAt, answeredAt }
+  // Demande envoyée à la société de ménage à la création de la loc (avec la facture à confirmer).
+  // Sans entrée = location de démo déjà confirmée avec la société assignée au bateau.
+  menageRequests: {},
   // menageInvoices : missionKey -> { content, status: 'generee' | 'payee', paidAt }
   // Facture automatique entre l'agence et le prestataire de ménage, visible des deux côtés.
   menageInvoices: {},
@@ -298,6 +302,24 @@ export function toggleMenageDone(missionKey, by = { type: 'agency', name: "l'age
   if (nowDone) meta[missionKey] = { ...by, at: new Date().toISOString() }
   else delete meta[missionKey]
   state = { ...state, menageDone: { ...state.menageDone, [missionKey]: nowDone }, menageDoneMeta: meta }
+  listeners.forEach(fn => fn(state))
+}
+
+export function sendMenageRequest(bookingId, providerId) {
+  state = { ...state, menageRequests: { ...state.menageRequests, [bookingId]: { providerId, status: 'a_confirmer', sentAt: new Date().toISOString() } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function respondMenageRequest(bookingId, accept) {
+  const current = state.menageRequests[bookingId]
+  if (!current) return
+  state = { ...state, menageRequests: { ...state.menageRequests, [bookingId]: { ...current, status: accept ? 'acceptee' : 'refusee', answeredAt: new Date().toISOString() } } }
+  listeners.forEach(fn => fn(state))
+}
+
+// Prévient tous les écrans qu'une donnée a changé (ex. nouvelle location ajoutée).
+export function notifyChange() {
+  state = { ...state }
   listeners.forEach(fn => fn(state))
 }
 
