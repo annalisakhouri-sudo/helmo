@@ -54,6 +54,11 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
   const lastDayStr = format(days[days.length - 1], 'yyyy-MM-dd')
 
   function getSpanStyle(b) {
+    // Sortie d'un jour : occupe exactement sa case, rien d'autre.
+    if (b.start === b.end) {
+      const di = dayIndex(b.start)
+      return { left: `${((di + 0.04) / N) * 100}%`, width: `${(0.92 / N) * 100}%` }
+    }
     let si = dayIndex(b.start)
     let startFraction = si === -1 ? (b.start < firstDayStr ? 0 : N) : si
     if (si === -1) si = startFraction
@@ -92,6 +97,7 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
   // (et qui n'a pas de nuitée à bord, donc fini la veille au soir) appartient à la semaine
   // précédente : on ne l'affiche pas du tout dans cette vue pour éviter un résidu minuscule.
   function isVisibleInView(b) {
+    if (b.start === b.end) return dayIndex(b.start) !== -1 // sortie d'un jour : visible si son jour est affiché
     const endIdx = dayIndex(b.end)
     if (endIdx === 0 && b.lastNightAboard === false) return false
     return days.some(d => { try { return isWithinInterval(d, { start: parseISO(b.start), end: parseISO(b.end) }) } catch { return false } })
@@ -102,6 +108,7 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
   function getMaintenanceBlocks(boatBookings) {
     const blocks = []
     boatBookings.forEach(b => {
+      if (b.start === b.end) return // sortie d'un jour : retour le soir, pas de rotation du samedi
       const next = bookings.find(o => o.boatId === b.boatId && o.start === b.end)
       if (!next) return
       if (next.clientId === b.clientId) return // même client qui reste à bord : pas de maintenance, continuité
@@ -154,6 +161,7 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
                   <div key={b.id} className={`absolute top-2 bottom-2 rounded-lg px-2.5 py-1.5 cursor-pointer border ${c.bg} ${c.border} ${c.text} hover:opacity-85 transition-opacity overflow-hidden shadow-sm`} style={{ ...span, zIndex: highlightId === b.id ? 5 : 1, ...(highlightId === b.id ? { boxShadow: '0 0 0 3px #F59E0B, 0 0 18px 4px rgba(245,158,11,0.55)', transform: 'scale(1.03)' } : highlightId ? { opacity: 0.35 } : {}), transition: 'all 0.3s ease' }} onClick={() => onSelect(b)}>
                     <p className="text-xs font-semibold truncate">{b.client}</p>
                     <div className="flex gap-1 mt-1 flex-wrap">
+                      {b.start === b.end && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#fff', color: '#0F6E56', border: '1px solid #9FE1CB', fontWeight: 500, whiteSpace: 'nowrap' }}>Journée</span>}
                       {(b.skipperName || b.skipperId) && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#185FA5', color: '#E6F1FB', fontWeight: 500, whiteSpace: 'nowrap' }}>{(b.skipperName || 'Skipper').split(' ')[0]}</span>}
                       {b.status === 'skipper-missing' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FAEEDA', color: '#633806', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Skipper</span>}
                       {b.status === 'doc-issue' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FCEBEB', color: '#791F1F', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Doc</span>}
@@ -247,7 +255,7 @@ function MonthView({ date, boats, bookings, onSelect }) {
                   const isStart = format(day,'yyyy-MM-dd') === b.start
                   return (
                     <div key={b.id} title={`${b.boatName} — ${b.client}`} className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer truncate ${c.bg} ${c.text} hover:opacity-80`} onClick={() => onSelect(b)}>
-                      {isStart ? `▶ ${boatLabel(b.boatName)} · ${b.client.split(' ')[0]}` : `— ${boatLabel(b.boatName)}`}
+                      {b.start === b.end ? `☀ ${boatLabel(b.boatName)} · ${b.client.split(' ')[0]}` : isStart ? `▶ ${boatLabel(b.boatName)} · ${b.client.split(' ')[0]}` : `— ${boatLabel(b.boatName)}`}
                     </div>
                   )
                 })}

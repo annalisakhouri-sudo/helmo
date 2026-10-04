@@ -5,6 +5,33 @@ import { Search, Star, MessageCircle, CalendarPlus, X, Check, Shield } from 'luc
 import { SKIPPERS, BOOKINGS } from '@/lib/mock-data'
 import { Card, SectionLabel, Avatar } from '@/components/ui'
 
+const TODAY_STR = '2026-07-04'
+
+// Missions de ce skipper avec l'agence, séparées en passées / à venir.
+function getSkipperHistory(skipperId) {
+  const all = BOOKINGS.filter(b => b.skipperId === skipperId)
+  const past = all.filter(b => b.end < TODAY_STR).sort((a, b) => b.end.localeCompare(a.end))
+  const upcoming = all.filter(b => b.end >= TODAY_STR).sort((a, b) => a.start.localeCompare(b.start))
+  return { past, upcoming }
+}
+
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+function MissionRow({ b, upcoming }) {
+  return (
+    <div className="flex items-center gap-2.5 bg-gray-50 rounded-lg p-2.5">
+      <div className={`w-1.5 self-stretch rounded-full ${upcoming ? 'bg-navy-400' : 'bg-teal-400'}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium truncate">{b.boatName}</p>
+        <p className="text-[10px] text-gray-400 truncate">{b.client} · {b.guests}</p>
+      </div>
+      <p className="text-[10px] text-gray-500 flex-shrink-0">{b.start === b.end ? fmtDate(b.start) : `${fmtDate(b.start)} → ${fmtDate(b.end)}`}</p>
+    </div>
+  )
+}
+
 const PERMIS_ICONS = { 'Côtier': '🪪', 'Hauturier': '🌊', 'CRR': '📻', 'STCW': '⛑️', 'Yachtmaster': '🏅' }
 
 function Stars({ rating }) {
@@ -24,6 +51,7 @@ function SkipperDetail({ skipper, onClose }) {
     const d = `2026-07-${String(i+1).padStart(2, '0')}`
     return { day: i+1, busy: skipper.availability.busy.includes(d) }
   })
+  const history = getSkipperHistory(skipper.id)
   const firstDayOffset = new Date('2026-07-01').getDay()
   const padded = Array(firstDayOffset === 0 ? 6 : firstDayOffset - 1).fill(null)
 
@@ -88,6 +116,40 @@ function SkipperDetail({ skipper, onClose }) {
           </div>
 
           <div>
+            <SectionLabel>Historique avec vous</SectionLabel>
+            {history.past.length === 0 && history.upcoming.length === 0 ? (
+              <p className="text-xs text-gray-400 mb-4">Aucune mission avec votre agence pour l'instant.</p>
+            ) : (
+              <div className="mb-4">
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="card-sm text-center">
+                    <p className="font-display text-lg font-bold text-navy-600">{history.past.length}</p>
+                    <p className="text-[10px] text-gray-400">mission{history.past.length > 1 ? 's' : ''} réalisée{history.past.length > 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="card-sm text-center">
+                    <p className="font-display text-lg font-bold text-navy-600">{history.upcoming.length}</p>
+                    <p className="text-[10px] text-gray-400">à venir</p>
+                  </div>
+                </div>
+                {history.upcoming.length > 0 && (
+                  <>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">À venir</p>
+                    <div className="flex flex-col gap-1.5 mb-3">
+                      {history.upcoming.map(b => <MissionRow key={b.id} b={b} upcoming />)}
+                    </div>
+                  </>
+                )}
+                {history.past.length > 0 && (
+                  <>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">Passées</p>
+                    <div className="flex flex-col gap-1.5">
+                      {history.past.map(b => <MissionRow key={b.id} b={b} />)}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <SectionLabel>Disponibilités — juillet 2026</SectionLabel>
             <div className="mb-3">
               <div className="grid grid-cols-7 gap-1 mb-1">
@@ -126,8 +188,14 @@ export default function Skippers() {
   const [tab, setTab] = useState('tous') // 'tous' | 'connus'
 
   const withHistory = SKIPPERS.map(s => {
-    const pastBookings = BOOKINGS.filter(b => b.skipperId === s.id).sort((a, b) => b.end.localeCompare(a.end))
-    return { ...s, agencyMissions: pastBookings.length, lastMissionDate: pastBookings[0]?.end || null }
+    const { past, upcoming } = getSkipperHistory(s.id)
+    return {
+      ...s,
+      agencyMissions: past.length + upcoming.length,
+      pastCount: past.length,
+      lastMissionDate: past[0]?.end || null,
+      nextMissionDate: upcoming[0]?.start || null,
+    }
   })
 
   const filtered = withHistory.filter(s => {
@@ -191,7 +259,11 @@ export default function Skippers() {
                   <Shield size={11} className="text-teal-600 flex-shrink-0" title="Vérifié Helmo" />
                 </div>
                 {s.agencyMissions > 0 ? (
-                  <p className="text-xs text-gray-400">{s.agencyMissions} mission{s.agencyMissions > 1 ? 's' : ''} avec vous · Dernière : {s.lastMissionDate}</p>
+                  <p className="text-xs text-gray-400">
+                    {s.agencyMissions} mission{s.agencyMissions > 1 ? 's' : ''} avec vous
+                    {s.lastMissionDate && <> · Dernière : {fmtDate(s.lastMissionDate)}</>}
+                    {s.nextMissionDate && <> · Prochaine : {fmtDate(s.nextMissionDate)}</>}
+                  </p>
                 ) : (
                   <p className="text-xs text-gray-400">{s.location} · {s.missions} missions au total</p>
                 )}

@@ -1,39 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, X, Search, Upload, Check, ChevronRight, User, Phone, Mail, FileText, Shield, CreditCard, AlertTriangle, Pencil } from 'lucide-react'
-import { differenceInDays, parseISO } from 'date-fns'
 import { CLIENTS, BOOKINGS, BOATS, DOC_LABELS } from '@/lib/mock-data'
 import { Card, SectionLabel } from '@/components/ui'
 import FileUpload from '@/components/ui/FileUpload'
+import { getClientAlerts, getUrgentClientAlerts, updateClient, subscribeClients } from '@/lib/client-alerts'
 
 const PERMIS_TYPES = ['Côtier', 'Hauturier', 'Fluvial', 'Yachtmaster', 'Aucun']
 const CAUTION_MODES = ['CB', 'Chèque', 'Virement', 'Empreinte CB']
-
-const TODAY = new Date('2026-07-04')
-
-// Une alerte client n'est "urgente" (danger/warn) que si sa prochaine loc est proche.
-function getClientAlerts(client, bookings = []) {
-  const alerts = []
-  const clientBookings = bookings.filter(b => client.locations.includes(b.id))
-  const nextBooking = clientBookings
-    .map(b => { try { return { ...b, daysUntil: differenceInDays(parseISO(b.start), TODAY) } } catch { return null } })
-    .filter(b => b && b.daysUntil >= 0)
-    .sort((a, b) => a.daysUntil - b.daysUntil)[0]
-
-  const isUrgent = nextBooking && nextBooking.daysUntil <= 7
-  const isSoon = nextBooking && nextBooking.daysUntil <= 14
-
-  if (!client.pieceId.uploaded) {
-    alerts.push({ id: 'pieceId', type: isUrgent ? 'danger' : isSoon ? 'warn' : 'info', msg: "Pièce d'identité à compléter" })
-  }
-  if (!client.permis.uploaded && client.permis.type) {
-    alerts.push({ id: 'permis', type: isSoon ? 'warn' : 'info', msg: 'Permis à uploader' })
-  }
-  if (client.caution.statut === 'en_attente') {
-    alerts.push({ id: 'caution', type: isUrgent ? 'warn' : 'info', msg: `Caution en attente (${client.caution.montant}€)` })
-  }
-  return alerts
-}
 
 function ClientCard({ client, onSelect }) {
   const alerts = getClientAlerts(client, BOOKINGS)
@@ -323,6 +297,7 @@ function ClientDetail({ client, onClose }) {
               <FileUpload
                 onUpload={() => {
                   setDocs(d => ({ ...d, [uploadTarget]: true }))
+                  updateClient(client, { [uploadTarget]: { ...client[uploadTarget], uploaded: true } })
                   setTimeout(() => setUploadTarget(null), 600)
                 }}
               />
@@ -335,7 +310,7 @@ function ClientDetail({ client, onClose }) {
         <CautionEditModal
           caution={caution}
           onClose={() => setShowCautionEdit(false)}
-          onSave={updated => setCaution(updated)}
+          onSave={updated => { setCaution(updated); updateClient(client, { caution: updated }) }}
         />
       )}
 
@@ -490,6 +465,8 @@ export default function Clients() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const allClients = [...CLIENTS, ...extraClients]
+  const [, refresh] = useState(0)
+  useEffect(() => subscribeClients(() => refresh(v => v + 1)), [])
 
   useEffect(() => {
     const clientId = searchParams.get('client')
@@ -505,10 +482,7 @@ export default function Clients() {
     `${c.prenom} ${c.nom} ${c.tel} ${c.email}`.toLowerCase().includes(search.toLowerCase())
   )
 
-  const alerts = allClients.flatMap(c => {
-    const a = getClientAlerts(c, BOOKINGS)
-    return a.map(alert => ({ ...alert, client: c }))
-  }).filter(a => a.type === 'danger')
+  const alerts = getUrgentClientAlerts(allClients, BOOKINGS)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

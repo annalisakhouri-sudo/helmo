@@ -40,7 +40,9 @@ export function buildAllMenageMissions() {
     if (!provider) return
 
     const hasLastNight = b.lastNightAboard !== false
-    const date = hasLastNight ? b.end : format(addDays(parseISO(b.end), -1), 'yyyy-MM-dd')
+    // Sortie d'un jour : ménage le soir même, au retour (sinon la date tombait la veille).
+    const isDayTrip = b.start === b.end
+    const date = isDayTrip || hasLastNight ? b.end : format(addDays(parseISO(b.end), -1), 'yyyy-MM-dd')
     const key = `menage-${b.id}`
     const menageOption = OPTIONS_CATALOG.find(o => o.id === 'menage')
     missions.push({
@@ -53,7 +55,7 @@ export function buildAllMenageMissions() {
       boat: boat.name,
       client: b.client,
       bookingId: b.id,
-      heure: hasLastNight ? '10:30' : '17:30',
+      heure: isDayTrip ? '18:30' : hasLastNight ? '10:30' : '17:30',
       statut: computeStatut(date),
       done: !!done[key],
       // Gardé même s'il n'y a qu'une seule agence aujourd'hui : permet de regrouper par

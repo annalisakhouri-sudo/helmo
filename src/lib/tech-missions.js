@@ -33,6 +33,19 @@ const RETOUR_SAMEDI_TASKS = [
   { label: 'Nettoyage' },
   { label: 'Rapport état des lieux' },
 ]
+// Sortie à la journée (bateau à moteur / semi-rigide, pas de cabines) : pas de draps,
+// on contrôle surtout le carburant et la sécurité.
+const DEPART_JOURNEE_TASKS = [
+  { label: 'Plein carburant vérifié' },
+  { label: 'Équipements sécurité' },
+  { label: 'Briefing client' },
+]
+const RETOUR_JOURNEE_TASKS = [
+  { label: 'Check-out avec le client' },
+  { label: 'Niveau carburant relevé' },
+  { label: 'Rinçage / nettoyage' },
+  { label: 'Rapport état des lieux' },
+]
 const RETOUR_VENDREDI_TASKS = [
   { label: 'Check-out avec le client' },
   { label: 'Draps retirés' },
@@ -60,6 +73,8 @@ export function buildAllMissions() {
     const defaultTech = getDefaultTechForBoat(b.boatId)
     if (!defaultTech) return
     const realClient = CLIENTS.find(c => c.locations.includes(b.id))
+    // Sortie d'un jour : départ et retour le même jour (sinon le retour tombait la veille).
+    const isDayTrip = b.start === b.end
 
     // ── Départ ──
     const departKey = `dep-${b.id}`
@@ -78,16 +93,16 @@ export function buildAllMissions() {
       clientId: realClient?.id || null,
       bookingId: b.id,
       skipperId: b.skipperId,
-      heure: '08:30',
+      heure: isDayTrip ? '09:00' : '08:30',
       statut: computeStatut(b.start),
-      defaultTasks: DEFAULT_DEPART_TASKS,
+      defaultTasks: isDayTrip ? DEPART_JOURNEE_TASKS : DEFAULT_DEPART_TASKS,
     })
 
     // ── Retour ──
     const retourKey = `ret-${b.id}`
     const retourTechId = assignments[retourKey] || defaultTech.id
     const hasLastNight = b.lastNightAboard !== false
-    const retourDate = hasLastNight ? b.end : format(addDays(parseISO(b.end), -1), 'yyyy-MM-dd')
+    const retourDate = isDayTrip || hasLastNight ? b.end : format(addDays(parseISO(b.end), -1), 'yyyy-MM-dd')
     missions.push({
       id: retourKey,
       key: retourKey,
@@ -102,16 +117,21 @@ export function buildAllMissions() {
       clientId: realClient?.id || null,
       bookingId: b.id,
       skipperId: b.skipperId,
-      heure: hasLastNight ? '10:00' : '17:00',
-      moment: hasLastNight ? 'Samedi matin' : 'Vendredi soir',
+      heure: isDayTrip ? '18:00' : hasLastNight ? '10:00' : '17:00',
+      moment: isDayTrip ? 'Fin de sortie' : hasLastNight ? 'Samedi matin' : 'Vendredi soir',
       statut: computeStatut(retourDate),
-      defaultTasks: hasLastNight ? RETOUR_SAMEDI_TASKS : RETOUR_VENDREDI_TASKS,
+      defaultTasks: isDayTrip ? RETOUR_JOURNEE_TASKS : hasLastNight ? RETOUR_SAMEDI_TASKS : RETOUR_VENDREDI_TASKS,
     })
   })
 
   // Ordre chronologique, retours avant départs à date égale (il faut rendre le bateau
   // avant de pouvoir le relouer).
-  missions.sort((a, b) => a.date.localeCompare(b.date) || (a.type === 'retour' ? -1 : 1) - (b.type === 'retour' ? -1 : 1))
+  // Exception : pour une sortie d'un jour, le départ précède évidemment son propre retour.
+  missions.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date)
+    if (a.bookingId === b.bookingId) return a.type === 'depart' ? -1 : 1
+    return (a.type === 'retour' ? -1 : 1) - (b.type === 'retour' ? -1 : 1)
+  })
   return missions
 }
 

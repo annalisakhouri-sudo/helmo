@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Users, Wrench, Sparkles,
@@ -7,6 +7,7 @@ import {
 import { clsx } from 'clsx'
 import { BRANDS } from '@/lib/mock-data'
 import GlobalSearch from './GlobalSearch'
+import { getUrgentClientAlerts, subscribeClients } from '@/lib/client-alerts'
 
 const NAV = [
   {
@@ -19,7 +20,7 @@ const NAV = [
   {
     section: 'Locations',
     items: [
-      { to: '/clients', label: 'Clients', icon: UserCircle },
+      { to: '/clients', label: 'Clients', icon: UserCircle, badge: 'clientAlerts' },
       { to: '/options', label: 'Options & tarifs', icon: Tag },
     ],
   },
@@ -43,6 +44,9 @@ const NAV = [
 export default function AppLayout({ user, onLogout }) {
   const [activeBrand, setActiveBrand] = useState('midi-nautisme')
   const brand = BRANDS[activeBrand]
+  const [, refresh] = useState(0)
+  useEffect(() => subscribeClients(() => refresh(v => v + 1)), [])
+  const badges = { clientAlerts: getUrgentClientAlerts().length }
 
   return (
     <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
@@ -86,11 +90,19 @@ export default function AppLayout({ user, onLogout }) {
           {NAV.map(({ section, items }) => (
             <div key={section}>
               <p className="px-5 pt-3 pb-1 text-[9px] font-medium uppercase tracking-widest text-navy-100 opacity-40">{section}</p>
-              {items.map(({ to, label, icon: Icon }) => (
-                <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
-                  <Icon size={14} /><span>{label}</span>
-                </NavLink>
-              ))}
+              {items.map(({ to, label, icon: Icon, badge }) => {
+                const count = badge ? badges[badge] : 0
+                return (
+                  <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+                    <Icon size={14} /><span>{label}</span>
+                    {count > 0 && (
+                      <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-danger-400 text-white text-[10px] font-bold flex items-center justify-center" title={`${count} alerte${count > 1 ? 's' : ''} urgente${count > 1 ? 's' : ''}`}>
+                        {count}
+                      </span>
+                    )}
+                  </NavLink>
+                )
+              })}
             </div>
           ))}
         </nav>
