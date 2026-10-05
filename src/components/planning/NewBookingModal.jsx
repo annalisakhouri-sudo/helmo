@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { X, AlertTriangle, Check, CircleCheck, FileText, Send } from 'lucide-react'
-import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, CONTRACT_TEMPLATES, MENAGE_PROVIDERS } from '@/lib/mock-data'
+import { BOATS, SKIPPERS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES, CONTRACT_TEMPLATES, MENAGE_PROVIDERS, CLIENTS } from '@/lib/mock-data'
 import { getDefaultMenageForBoat } from '@/lib/menage-missions'
 import { sendSkipperRequest } from '@/lib/skipper-requests'
 import { buildContractContent, getDefaultTemplateId } from '@/lib/contract'
@@ -64,10 +64,25 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
 
   const [form, setForm] = useState({
     boatId: '', dateStart: '', dateEnd: '', guests: '',
-    nom: '', prenom: '', tel: '', email: '',
+    nom: '', prenom: '', tel: '', email: '', clientId: '',
     options: {}, freeOptions: {}, basePrice: '', basePriceAuto: null, discountPercent: '0',
     skipperName: '', skipperId: '', menageProviderId: '', cabines: '3', supQty: '2', masqueQty: '3', franchise: '1500', statut: 'confirmed', dureeOption: '48h', lastNightAboard: true,
   })
+
+  const [clientQuery, setClientQuery] = useState('')
+  const norm = v => (v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s/g, '')
+  const clientMatches = clientQuery.trim().length >= 2
+    ? CLIENTS.filter(c => norm(`${c.prenom}${c.nom}${c.nom}${c.prenom}${c.tel}${c.email}`).includes(norm(clientQuery))).slice(0, 5)
+    : []
+  const selectedClient = CLIENTS.find(c => c.id === form.clientId)
+  function chooseClient(c) {
+    setForm(f => ({ ...f, clientId: c.id, nom: c.nom, prenom: c.prenom, tel: c.tel, email: c.email || '' }))
+    setClientQuery('')
+    setErrors(e => ({ ...e, nom: '', prenom: '', tel: '' }))
+  }
+  function clearClient() {
+    setForm(f => ({ ...f, clientId: '', nom: '', prenom: '', tel: '', email: '' }))
+  }
 
   const [contractTemplateId, setContractTemplateId] = useState(null)
   const [contractContent, setContractContent] = useState(null)
@@ -183,7 +198,8 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
       boatId: form.boatId,
       boatName: boat?.name || '',
       brand: activeBrand,
-      client: form.prenom + ' ' + form.nom,
+      clientId: form.clientId || null,
+      client: form.nom + ' ' + form.prenom,
       phone: form.tel,
       guests: form.guests,
       start: form.dateStart,
@@ -199,7 +215,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
       basePrice: parseFloat(form.basePrice) || 0,
       discountPercent: parseFloat(form.discountPercent) || 0,
       lastNightAboard: form.lastNightAboard,
-    })
+    }, { nom: form.nom, prenom: form.prenom, email: form.email })
     // Skipper choisi à la création → vraie demande (il est affecté quand il accepte).
     if (form.options.skipper && form.skipperId) {
       sendSkipperRequest({ id: newId, boatName: boat?.name || '', start: form.dateStart, end: form.dateEnd, guests: form.guests }, form.skipperId)
@@ -415,6 +431,40 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
           {/* ÉTAPE 2 */}
           {step === 2 && (
             <div>
+              {selectedClient ? (
+                <div className="flex items-center gap-3 p-3 mb-4 rounded-xl bg-teal-50 border border-teal-100">
+                  <Check size={14} className="text-teal-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-teal-800">Client existant · {selectedClient.locations.length} location{selectedClient.locations.length > 1 ? 's' : ''}</p>
+                    <p className="text-[11px] text-teal-700">
+                      {[!selectedClient.pieceId.uploaded && "pièce d'identité", selectedClient.permis.type && !selectedClient.permis.uploaded && 'permis', selectedClient.caution.statut !== 'recue' && 'caution'].filter(Boolean).join(', ') || 'Dossier complet'}
+                      {[!selectedClient.pieceId.uploaded, selectedClient.permis.type && !selectedClient.permis.uploaded, selectedClient.caution.statut !== 'recue'].some(Boolean) && ' à compléter'}
+                    </p>
+                  </div>
+                  <button type="button" className="text-[11px] text-gray-500 hover:text-navy-600" onClick={clearClient}>Changer</button>
+                </div>
+              ) : (
+                <div className="mb-4 relative">
+                  <input
+                    type="text"
+                    className="w-full text-sm px-3 py-2.5 border border-navy-100 rounded-xl bg-navy-50 focus:outline-none focus:border-navy-600 focus:bg-white"
+                    placeholder="Client déjà venu ? Tape son nom ou son téléphone…"
+                    value={clientQuery}
+                    onChange={e => setClientQuery(e.target.value)}
+                  />
+                  {clientMatches.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-10 overflow-hidden">
+                      {clientMatches.map(c => (
+                        <button key={c.id} type="button" className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50" onClick={() => chooseClient(c)}>
+                          <span className="text-sm">{c.prenom} {c.nom}</span>
+                          <span className="text-[11px] text-gray-400">{c.tel} · {c.locations.length} loc.</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-gray-400 mt-1.5">Nouveau client ? Remplis les champs ci-dessous : sa fiche est créée automatiquement, et les documents manquants te seront rappelés dans Clients.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Nom" required error={errors.nom}>
                   <input type="text" className={inputClass('nom')} placeholder="Dupont" value={form.nom} onChange={e => set('nom', e.target.value)} />

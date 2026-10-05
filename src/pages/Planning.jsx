@@ -420,7 +420,7 @@ export default function Planning() {
       </div>
 
       {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onFindSkipper={() => navigate('/skippers')} onViewDocs={() => navigate('/bateaux')} onViewClientDocs={() => navigate('/clients')} onViewClient={() => { const c = CLIENTS.find(c => c.locations.includes(selected.id)); navigate(c ? `/clients?client=${c.id}` : '/clients') }} onBookingChange={() => forcePlanningUpdate(v => v + 1)} />}
-      {showNew && <NewBookingModal activeBrand={activeBrand} onClose={() => setShowNew(false)} onAdd={b => { addBooking(b); forcePlanningUpdate(v => v + 1) }} />}
+      {showNew && <NewBookingModal activeBrand={activeBrand} onClose={() => setShowNew(false)} onAdd={(b, info) => { addBooking(b, info); forcePlanningUpdate(v => v + 1) }} />}
 
       {gapInfo && (() => {
         const nextBooking = allBookings.find(o => o.boatId === gapInfo.boat.id && o.start === gapInfo.booking.end)

@@ -73,7 +73,7 @@ export function buildAllMissions() {
     if (!boat) return
     const defaultTech = getDefaultTechForBoat(b.boatId)
     if (!defaultTech) return
-    const realClient = CLIENTS.find(c => c.locations.includes(b.id))
+    const realClient = CLIENTS.find(c => c.id === b.clientId) || CLIENTS.find(c => c.locations.includes(b.id))
     // Société de ménage qui intervient avant ce départ / à ce retour (null = le technicien nettoie).
     const menageDepart = getMenageForTechMission('depart', b)
     const menageRetour = getMenageForTechMission('retour', b)

@@ -9,9 +9,9 @@ export function addBooking(booking, clientInfo = {}) {
   BOOKINGS.push(booking)
 
   // Rattachement à la fiche client (création si c'est un nouveau client).
-  const [prenom, ...rest] = booking.client.split(' ')
-  const nom = rest.join(' ')
-  let client = CLIENTS.find(c => `${c.prenom} ${c.nom}`.toLowerCase() === booking.client.toLowerCase() || `${c.nom} ${c.prenom}`.toLowerCase() === booking.client.toLowerCase())
+  const nom = clientInfo.nom || booking.client.split(' ')[0]
+  const prenom = clientInfo.prenom || booking.client.split(' ').slice(1).join(' ')
+  let client = (booking.clientId && CLIENTS.find(c => c.id === booking.clientId)) || CLIENTS.find(c => `${c.prenom} ${c.nom}`.toLowerCase() === booking.client.toLowerCase() || `${c.nom} ${c.prenom}`.toLowerCase() === booking.client.toLowerCase())
   if (client) {
     updateClient(client, { locations: [...client.locations, booking.id] })
   } else {
@@ -29,6 +29,7 @@ export function addBooking(booking, clientInfo = {}) {
     CLIENTS.push(client)
     updateClient(client, {})
   }
+  booking.clientId = client.id
 
   // Ménage : la demande (avec sa facture à confirmer) part à la société choisie.
   if (booking.options?.menage && booking.menageProviderId) {

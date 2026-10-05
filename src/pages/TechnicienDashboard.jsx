@@ -631,9 +631,18 @@ function TechMission({ tech, mission, tasks, onBack, onToggle, sharedState }) {
 
 // ── Dashboard principal ───────────────────────────────────────────
 export default function TechnicienDashboard({ onLogout }) {
-  const [selectedTech, setSelectedTech] = useState(null)
+  const [selectedTech, setSelectedTechState] = useState(null)
   const [selectedMission, setSelectedMission] = useState(null)
-  const [activeView, setActiveView] = useState('equipe')
+  const [activeView, setActiveViewState] = useState('equipe')
+  // Technicien connecté en démo = Karim (tech-1). « Mon planning » ouvre SON planning
+  // (avant, le bouton ne faisait rien tant qu'aucun technicien n'était sélectionné).
+  const ME = 'tech-1'
+  const setSelectedTech = id => setSelectedTechState(id)
+  const setActiveView = v => {
+    setActiveViewState(v)
+    if (v === 'planning' && !selectedTech) setSelectedTechState(ME)
+    if (v === 'equipe') { setSelectedTechState(null); setSelectedMission(null) }
+  }
   const [sharedState, setSharedState] = useState(getState())
 
   useEffect(() => subscribe(s=>setSharedState(s)), [])
