@@ -11,6 +11,8 @@ import { getState, subscribe } from '@/lib/shared-state'
 import { getRequest } from '@/lib/skipper-requests'
 import { getUnconfirmedMenages } from '@/lib/menage-missions'
 import { getUnassignedMissions } from '@/lib/tech-missions'
+import { buildInvoiceData } from '@/lib/invoice'
+const sumInvoice = b => buildInvoiceData(b).lineItems.reduce((n, li) => n + (Number(li.amount) || 0), 0)
 import { SKIPPERS } from '@/lib/mock-data'
 import { fmtDate, fmtRange } from '@/lib/dates'
 
@@ -263,7 +265,7 @@ export default function Dashboard() {
               <p className="text-xs text-gray-400 mt-0.5">Retour{retours.length > 1 ? 's' : ''} cette semaine</p>
             </div>
           </div>
-          <div className="card flex items-center gap-4">
+          <div className="card flex items-center gap-4 cursor-pointer hover:shadow-card-hover transition-all duration-200" onClick={() => document.getElementById('a-traiter')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
             <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: incomplete.length > 0 ? '#FEF0F0' : '#E2F5EF' }}>
               <AlertTriangle size={18} style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57' }} />
             </div>
@@ -279,7 +281,7 @@ export default function Dashboard() {
 
         {/* Alertes uniquement — ce qui bloque vraiment */}
         {(incomplete.length > 0 || refusedMenages.length > 0 || unassignedTech.length > 0) && (
-          <div className="mb-6">
+          <div className="mb-6 scroll-mt-4" id="a-traiter">
             <p className="section-label">À traiter</p>
             <div className="flex flex-col gap-2">
               {unassignedTech.length > 0 && (
@@ -320,28 +322,21 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Suivi des paiements : factures envoyées, en attente de règlement */}
-        {pendingInvoices.length > 0 && (
-          <div className="mb-6">
-            <p className="section-label">Paiements en attente</p>
-            <div className="flex flex-col gap-2">
-              {pendingInvoices.map(({ booking: b, invoice }) => (
-                <div
-                  key={b.id}
-                  className="flex items-center gap-3 rounded-xl p-3 border bg-navy-50 border-navy-100 cursor-pointer hover:bg-navy-100 transition-colors"
-                  onClick={() => { setSelectedBooking(b); setSelectedContext('depart') }}
-                >
-                  <Euro size={14} className="text-navy-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate text-navy-800">{b.boatName} — {b.client}</p>
-                    <p className="text-xs text-navy-700">Facture envoyée le {fmtDate(invoice.sentAt)} · pas encore réglée</p>
-                  </div>
-                  <span className="text-[10px] text-navy-600 font-medium whitespace-nowrap">Voir →</span>
-                </div>
-              ))}
+        {/* Paiements : un résumé, le détail est dans Facturation */}
+        {pendingInvoices.length > 0 && (() => {
+          const total = pendingInvoices.reduce((n, { booking: b, invoice }) => n + (invoice?.data ? invoice.data.lineItems.reduce((x, li) => x + (Number(li.amount) || 0), 0) : sumInvoice(b)), 0)
+          const late = pendingInvoices.filter(({ booking: b }) => b.start < format(TODAY, 'yyyy-MM-dd')).length
+          return (
+            <div className="mb-6 flex items-center gap-3 rounded-xl p-3 border bg-navy-50 border-navy-100 cursor-pointer hover:bg-navy-100 transition-colors" onClick={() => navigate('/facturation')}>
+              <Euro size={14} className="text-navy-600 flex-shrink-0" />
+              <p className="flex-1 text-xs text-navy-800">
+                <strong>{pendingInvoices.length} facture{pendingInvoices.length > 1 ? 's' : ''} à encaisser</strong> · {Math.round(total).toLocaleString('fr-FR')} €
+                {late > 0 && <span className="text-danger-600"> · dont {late} en retard</span>}
+              </p>
+              <span className="text-[10px] text-navy-600 font-medium whitespace-nowrap">Facturation →</span>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Anticiper : ce qui arrive la semaine prochaine (cette semaine est déjà couverte
             par les 3 compteurs cliquables plus haut — pas besoin de la répéter ici) */}

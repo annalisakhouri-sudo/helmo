@@ -7,7 +7,7 @@ import { getMissionsForProvider, getPendingRequestsForProvider, getProviderByAcc
 import { getState, subscribe, toggleMenageDone, respondMenageRequest } from '@/lib/shared-state'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
-function CodeLogin({ onSuccess }) {
+function CodeLogin({ onSuccess, onBack }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
 
@@ -40,6 +40,7 @@ function CodeLogin({ onSuccess }) {
           </div>
           <button type="submit" className="btn-primary w-full justify-center py-2.5">Accéder à mon planning</button>
         </form>
+        <button type="button" onClick={onBack} className="block mx-auto mt-4 text-xs text-navy-100 hover:text-white">← Retour au menu</button>
       </div>
     </div>
   )
@@ -54,7 +55,7 @@ export default function MenageDashboard({ onLogout }) {
   const [sharedState, setSharedState] = useState(getState())
   useEffect(() => subscribe(s => setSharedState(s)), [])
 
-  if (!providerId) return <CodeLogin onSuccess={setProviderId} />
+  if (!providerId) return <CodeLogin onSuccess={setProviderId} onBack={onLogout} />
 
   const provider = MENAGE_PROVIDERS.find(p => p.id === providerId)
   const missions = getMissionsForProvider(providerId)

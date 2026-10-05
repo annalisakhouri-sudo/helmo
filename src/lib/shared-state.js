@@ -35,6 +35,8 @@ let state = {
   // menageInvoices : missionKey -> { content, status: 'generee' | 'payee', paidAt }
   // Facture automatique entre l'agence et le prestataire de ménage, visible des deux côtés.
   menageInvoices: {},
+  // skipperPayments : bookingId -> { paidAt, via } — l'agence a payé le skipper de cette location.
+  skipperPayments: {},
   // contracts : voir les fonctions getContract/setContractTemplate/updateContractContent/sendContract plus bas
   contracts: {},
   // invoices : bookingId -> { data: {...lignes modifiables}, status: 'brouillon' | 'envoyee' | 'payee', sentAt, paidAt }
@@ -326,6 +328,11 @@ export function respondMenageRequest(bookingId, accept) {
   const current = state.menageRequests[bookingId]
   if (!current) return
   state = { ...state, menageRequests: { ...state.menageRequests, [bookingId]: { ...current, status: accept ? 'acceptee' : 'refusee', answeredAt: new Date().toISOString() } } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function markSkipperPaid(bookingId, via = 'manuel') {
+  state = { ...state, skipperPayments: { ...state.skipperPayments, [bookingId]: { paidAt: '2026-07-04', via } } }
   listeners.forEach(fn => fn(state))
 }
 

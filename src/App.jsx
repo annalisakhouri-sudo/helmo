@@ -10,6 +10,7 @@ import Bateaux from '@/pages/Bateaux'
 import Options from '@/pages/Options'
 import Clients from '@/pages/Clients'
 import Messagerie from '@/pages/Messagerie'
+import Facturation from '@/pages/Facturation'
 import FichePublique from '@/pages/FichePublique'
 import Login from '@/pages/Login'
 import SkipperDashboard from '@/pages/SkipperDashboard'
@@ -69,6 +70,7 @@ function AppWithAuth() {
         { path: 'bateaux', element: <Bateaux /> },
         { path: 'options', element: <Options /> },
         { path: 'messagerie', element: <Messagerie /> },
+        { path: 'facturation', element: <Facturation /> },
       ],
     },
   ])

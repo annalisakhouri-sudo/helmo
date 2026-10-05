@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Users, Wrench, Sparkles,
-  Anchor, UserCircle, MessageCircle, LogOut, Tag
+  Anchor, UserCircle, MessageCircle, LogOut, Tag, Receipt
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { BRANDS } from '@/lib/mock-data'
@@ -17,6 +17,7 @@ const NAV = [
       { to: '/', label: 'Vue d\'ensemble', icon: LayoutDashboard },
       { to: '/planning', label: 'Planning', icon: Calendar },
       { to: '/clients', label: 'Clients', icon: UserCircle, badge: 'clientAlerts' },
+      { to: '/facturation', label: 'Facturation', icon: Receipt },
       { to: '/messagerie', label: 'Messagerie', icon: MessageCircle, badge: 'messages' },
     ],
   },

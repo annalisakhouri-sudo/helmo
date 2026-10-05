@@ -3,9 +3,20 @@ import { BRANDS, CLIENTS, BOATS, OPTIONS_CATALOG, PRICING_PERIODS, BOAT_PRICES }
 
 const TODAY = new Date('2026-07-04')
 
-function computeBasePrice(boatId, startDate) {
-  const period = PRICING_PERIODS.find(p => startDate >= p.start && startDate <= p.end)
+// La grille saisonnière se répète chaque année (2027 = mêmes périodes que 2026).
+function weeklyPrice(boatId, startDate) {
+  const d = '2026' + startDate.slice(4)
+  const period = PRICING_PERIODS.find(p => d >= p.start && d <= p.end)
   return period && BOAT_PRICES[boatId]?.[period.id] ? BOAT_PRICES[boatId][period.id] : null
+}
+
+// Prix de la location : à la semaine (× nombre de semaines) ou à la journée (≈ 1/5 de la semaine).
+export function computeRentalPrice(booking) {
+  const weekly = weeklyPrice(booking.boatId, booking.start)
+  if (weekly == null) return null
+  if (booking.start === booking.end) return Math.round(weekly / 5 / 10) * 10
+  const days = Math.max(1, Math.round((new Date(booking.end) - new Date(booking.start)) / 86400000))
+  return Math.round(weekly * days / 7)
 }
 
 export function buildInvoiceNumber(booking) {
@@ -22,12 +33,14 @@ export function buildInvoiceData(booking) {
   const fallbackPrenom = fullName.slice(0, -1).join(' ') || fullName[0] || ''
   const fallbackNom = fullName.length > 1 ? fullName[fullName.length - 1] : ''
 
-  const basePrice = computeBasePrice(booking.boatId, booking.start)
+  const basePrice = computeRentalPrice(booking)
+  const isDay = booking.start === booking.end
+  const nbWeeks = Math.max(1, Math.round((new Date(booking.end) - new Date(booking.start)) / (7 * 86400000)))
   const lineItems = []
 
   lineItems.push({
     id: 'base',
-    label: `Location ${boat?.name || booking.boatName} (semaine)`,
+    label: `Location ${boat?.name || booking.boatName} (${isDay ? 'journée' : nbWeeks > 1 ? `${nbWeeks} semaines` : 'semaine'})`,
     amount: basePrice ?? 0,
     editable: true,
   })
