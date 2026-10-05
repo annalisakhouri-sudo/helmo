@@ -90,7 +90,7 @@ export function TechSidebar({ tech, onLogout, activeView, setView }) {
 
       <nav className="flex-1 min-h-0 overflow-y-auto pt-2">
         {[
-          { id: 'equipe', label: 'Équipe du jour', icon: Calendar },
+          { id: 'equipe', label: 'Équipe', icon: Calendar },
         { id: 'planning', label: 'Mon planning', icon: Calendar },
         ].map(({ id, label, icon: Icon }) => (
           <button

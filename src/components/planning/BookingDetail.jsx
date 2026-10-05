@@ -12,6 +12,9 @@ import SkipperPickerModal from '@/components/skippers/SkipperPickerModal'
 import { getRequest, subscribeSkipperRequests, respondSkipperRequest, cancelSkipperRequest } from '@/lib/skipper-requests'
 import { SKIPPERS } from '@/lib/mock-data'
 
+const STEP_DOT = { ok: 'bg-teal-400', wait: 'bg-navy-400', todo: 'bg-amber-400' }
+const fmtLong = d => new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })
+
 const DOC_ICONS = { francisation: FileText, assurance: Shield, securite: Anchor, jauge: Anchor }
 const DOC_NAMES = { francisation: 'Francisation', assurance: 'Assurance', securite: 'Carnet sécurité', jauge: 'Jauge' }
 
@@ -46,6 +49,26 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
     onBookingChange && onBookingChange(booking) // prévient le parent (dashboard/planning) que l'alerte doit disparaître
   }
 
+  const contractStatus = sharedState.contracts[booking.id]?.status || 'brouillon'
+  const invoiceStatus = sharedState.invoices[booking.id]?.status || 'brouillon'
+  const menageReq = sharedState.menageRequests?.[booking.id]
+  const steps = [
+    { id: 'contrat', label: 'Contrat', state: contractStatus === 'signe' ? 'ok' : contractStatus === 'envoye' ? 'wait' : 'todo', text: contractStatus === 'signe' ? 'signé' : contractStatus === 'envoye' ? 'envoyé' : 'à envoyer' },
+    { id: 'facture', label: 'Facture', state: invoiceStatus === 'payee' ? 'ok' : invoiceStatus === 'envoyee' ? 'wait' : 'todo', text: invoiceStatus === 'payee' ? 'réglée' : invoiceStatus === 'envoyee' ? 'envoyée' : 'à envoyer' },
+    ...(booking.needsSkipper || booking.skipperName || booking.skipperId ? [{
+      id: 'skipper', label: 'Skipper',
+      state: booking.skipperName || booking.skipperId ? 'ok' : pendingSkipper ? 'wait' : 'todo',
+      text: booking.skipperName ? booking.skipperName.split(' ')[0] : pendingSkipper ? 'en attente' : 'à trouver',
+    }] : []),
+    ...(booking.options?.menage ? [{
+      id: 'checkin', label: 'Ménage',
+      state: !menageReq || menageReq.status === 'acceptee' ? 'ok' : menageReq.status === 'a_confirmer' ? 'wait' : 'todo',
+      text: !menageReq || menageReq.status === 'acceptee' ? 'confirmé' : menageReq.status === 'a_confirmer' ? 'en attente' : 'refusé',
+    }] : []),
+    ...(boat && Object.values(boat.docs).some(d => d.status !== 'ok') ? [{ id: 'docs', label: 'Docs bateau', state: 'todo', text: 'à vérifier' }] : []),
+    { id: 'checkin', label: 'Check-in', state: checkInDone ? 'ok' : 'todo', text: checkInDone ? 'fait' : 'à faire' },
+  ]
+
   return (
     <>
       <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6">
@@ -54,17 +77,23 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
           <div className="bg-navy-900 px-6 py-4 flex items-center justify-between flex-shrink-0">
             <div>
               <h2 className="font-display text-white text-base font-bold">{booking.boatName} — {booking.client}</h2>
-              <p className="text-navy-100 text-xs mt-0.5">{booking.start} → {booking.end}</p>
+              <p className="text-navy-100 text-xs mt-0.5">{fmtLong(booking.start)} → {fmtLong(booking.end)}</p>
             </div>
             <div className="flex items-center gap-3">
-              {checkInDone
-                ? <span className="pill-ok flex items-center gap-1"><CircleCheck size={11} /> Check-in OK</span>
-                : booking.status === 'confirmed' ? <span className="pill-ok">Confirmée</span>
-                : booking.status === 'skipper-missing' ? <span className="pill-warn">Skipper manquant</span>
-                : <span className="pill-danger">Doc manquant</span>
-              }
               <button onClick={onClose} className="text-navy-100 hover:text-white"><X size={18} /></button>
             </div>
+          </div>
+
+          {/* Avancement : ce qui est prêt / ce qui manque, en un coup d'œil. Clic = va à la section. */}
+          <div className="px-5 py-2.5 border-b border-gray-100 flex flex-wrap gap-1.5 flex-shrink-0 bg-gray-50">
+            {steps.map(st => (
+              <button key={st.id} onClick={() => document.getElementById('bd-' + st.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-white border border-gray-200 hover:border-navy-200 transition-colors">
+                <span className={`w-2 h-2 rounded-full ${STEP_DOT[st.state]}`} />
+                <span className="text-gray-700">{st.label}</span>
+                <span className="text-gray-400 font-normal">{st.text}</span>
+              </button>
+            ))}
           </div>
 
           <div className="flex-1 overflow-auto p-5 grid grid-cols-2 gap-5">
@@ -129,7 +158,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
               )}
 
               <div>
-                <SectionLabel>Skipper</SectionLabel>
+                <div id="bd-skipper" className="scroll-mt-2" /><SectionLabel>Skipper</SectionLabel>
                 {booking.skipperName ? (
                   <div className={`card-sm ${booking.clientIsSkipper ? 'border border-navy-100 bg-navy-50' : ''}`}>
                     <div className="flex items-center gap-3">
@@ -184,7 +213,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
 
               {/* Contrat de location */}
               <div>
-                <SectionLabel>Contrat</SectionLabel>
+                <div id="bd-contrat" className="scroll-mt-2" /><SectionLabel>Contrat</SectionLabel>
                 {(() => {
                   const contractState = sharedState.contracts[booking.id]
                   const status = contractState?.status || 'brouillon'
@@ -221,7 +250,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
 
               {/* Facture */}
               <div>
-                <SectionLabel>Facture</SectionLabel>
+                <div id="bd-facture" className="scroll-mt-2" /><SectionLabel>Facture</SectionLabel>
                 {(() => {
                   const invoiceState = sharedState.invoices[booking.id]
                   const status = invoiceState?.status || 'brouillon'
@@ -249,7 +278,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
 
               {/* Check-in (toujours visible, quel que soit le contexte) */}
               <div>
-                <SectionLabel>Check-in {context === 'retour' && '(départ)'}</SectionLabel>
+                <div id="bd-checkin" className="scroll-mt-2" /><SectionLabel>Check-in {context === 'retour' && '(départ)'}</SectionLabel>
                 {checkInDone ? (
                   <div className="flex items-center gap-2.5 bg-teal-50 border border-teal-100 rounded-xl p-3">
                     <CircleCheck size={18} className="text-teal-600 flex-shrink-0" />
@@ -311,7 +340,7 @@ export default function BookingDetail({ booking, context = 'depart', onClose, on
             <div className="flex flex-col gap-4">
               {boat && (
                 <div>
-                  <SectionLabel>Documents bateau</SectionLabel>
+                  <div id="bd-docs" className="scroll-mt-2" /><SectionLabel>Documents bateau</SectionLabel>
                   <Card className="py-1 px-3">
                     {Object.entries(boat.docs).map(([key, doc]) => {
                       const Icon = DOC_ICONS[key] || FileText

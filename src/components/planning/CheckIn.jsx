@@ -14,7 +14,7 @@ function buildChecklist(boat, booking) {
 
   const sections = [
     {
-      category: '🔴 Sécurité obligatoire',
+      category: 'Sécurité obligatoire',
       items: isDayBoat ? [
         { id: 's1', label: 'Gilets de sauvetage', max: capacite },
         { id: 's3', label: 'Extincteur', max: 1 },
@@ -35,7 +35,7 @@ function buildChecklist(boat, booking) {
   // Cuisine et cabines n'existent pas sur un day boat (semi-rigide) — inutile de les vérifier.
   if (!isDayBoat) {
     sections.push({
-      category: '🍽 Cuisine & vaisselle',
+      category: 'Cuisine & vaisselle',
       items: [
         { id: 'c1', label: 'Assiettes', max: capacite },
         { id: 'c2', label: 'Bols', max: capacite },
@@ -50,7 +50,7 @@ function buildChecklist(boat, booking) {
       ],
     })
     sections.push({
-      category: '🛏 Cabines & confort',
+      category: 'Cabines & confort',
       items: [
         { id: 'b1', label: 'Oreillers', max: lits },
         { id: 'b2', label: 'Couvertures', max: lits },
@@ -63,7 +63,7 @@ function buildChecklist(boat, booking) {
   }
 
   sections.push({
-    category: '⚓ Équipement nautique',
+    category: 'Équipement nautique',
     items: isDayBoat ? [
       { id: 'n1', label: 'Jerricane carburant (plein)', max: 1 },
       { id: 'n2', label: 'Fenders', max: 4 },
@@ -90,7 +90,7 @@ function buildChecklist(boat, booking) {
     dynamicItems.push({ id: `opt-${optId}`, label: qty > 1 ? `${opt.label} × ${qty}` : opt.label, max: qty })
   })
   if (dynamicItems.length > 0) {
-    sections.push({ category: '🎒 Draps & options de cette location', items: dynamicItems })
+    sections.push({ category: 'Draps & options de cette location', items: dynamicItems })
   }
 
   return sections

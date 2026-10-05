@@ -7,6 +7,7 @@ import { buildContractContent, getDefaultTemplateId } from '@/lib/contract'
 import { setContractTemplate, sendContract } from '@/lib/shared-state'
 import OptionIcon from '@/components/ui/OptionIcon'
 import DateRangePicker from './DateRangePicker'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 // Trouve la période tarifaire correspondant à une date, et calcule le prix de location
 // en fonction du bateau et du nombre de semaines.
@@ -557,7 +558,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
               <div className="card mb-4 py-2 px-4">
                 {[
                   ['Bateau', boat?.name || '—'],
-                  ['Dates', `${form.dateStart} → ${form.dateEnd}`],
+                  ['Dates', fmtRange(form.dateStart, form.dateEnd)],
                   ['Personnes', form.guests],
                   ['Client', `${form.prenom} ${form.nom}`],
                   ['Téléphone', form.tel],

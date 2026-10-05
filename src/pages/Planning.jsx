@@ -1,11 +1,10 @@
-import { getRequest } from '@/lib/skipper-requests'
 import { addBooking } from '@/lib/bookings'
 import { useState, useEffect } from 'react'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check, Sparkles } from 'lucide-react'
 import { addDays, addMonths, format, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, getDay, endOfWeek } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS, SKIPPERS } from '@/lib/mock-data'
+import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from '@/lib/mock-data'
 import BookingDetail from '@/components/planning/BookingDetail'
 import NewBookingModal from '@/components/planning/NewBookingModal'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
@@ -26,7 +25,8 @@ const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','N
 
 function getBookingColor(b) {
   if (b.status === 'doc-issue') return { bg: 'bg-danger-50', border: 'border-danger-200', text: 'text-danger-800', dot: 'bg-danger-400' }
-  if (b.status === 'skipper-missing') return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', dot: 'bg-amber-300' }
+  // Jaune = skipper demandé mais pas encore affecté (y compris sur une loc créée à l'instant).
+  if (b.needsSkipper && !b.skipperId && !b.skipperName) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', dot: 'bg-amber-300' }
   return { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', dot: 'bg-teal-400' }
 }
 
@@ -165,12 +165,12 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {b.start === b.end && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#fff', color: '#0F6E56', border: '1px solid #9FE1CB', fontWeight: 500, whiteSpace: 'nowrap' }}>Journée</span>}
                       {(b.skipperName || b.skipperId) && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#185FA5', color: '#E6F1FB', fontWeight: 500, whiteSpace: 'nowrap' }}>{(b.skipperName || 'Skipper').split(' ')[0]}</span>}
-                      {b.status === 'skipper-missing' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FAEEDA', color: '#633806', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Skipper</span>}
+                      {b.needsSkipper && !b.skipperId && !b.skipperName && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FAEEDA', color: '#633806', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Skipper</span>}
                       {b.status === 'doc-issue' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: '#FCEBEB', color: '#791F1F', fontWeight: 500, whiteSpace: 'nowrap' }}>⚠ Doc</span>}
                       {b.options?.menage && (() => {
                         const done = !!getState().menageDone[`menage-${b.id}`]
                         return (
-                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: done ? '#E1F5EE' : '#FFF4D6', color: done ? '#085041' : '#854F0B', fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 20, background: done ? '#E1F5EE' : '#fff', color: done ? '#085041' : '#4B5563', border: done ? 'none' : '1px solid #E5E7EB', fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                             <Sparkles size={9} /> {done ? 'Ménage ✓' : 'Ménage'}
                           </span>
                         )
@@ -374,7 +374,6 @@ export default function Planning() {
   }
 
   const weekDays = Array.from({length:8},(_,i) => addDays(currentDate, i))
-  const skipperMissing = allBookings.filter(b => b.needsSkipper && !b.skipperId && !b.skipperName)
 
   function getLabel() {
     if (view === 'week') return `${format(weekDays[0],'d MMM',{locale:fr})} → ${format(weekDays[7],'d MMM yyyy',{locale:fr})}`
@@ -418,22 +417,6 @@ export default function Planning() {
         {view === 'month' && <MonthView date={currentDate} boats={filteredBoats} bookings={allBookings} onSelect={setSelected} />}
         {view === 'year' && <YearView year={currentDate.getFullYear()} boats={filteredBoats} bookings={allBookings} onSelect={setSelected} />}
 
-        {/* Alertes skipper */}
-        {skipperMissing.length > 0 && (
-          <div className="mt-3">
-            {skipperMissing.map(b => (
-              <div key={b.id} className="alert-warn mb-2">
-                <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
-                <span className="flex-1 text-sm text-amber-800">
-                  <strong>{b.boatName}</strong> — {b.client} : {getRequest(b.id)?.status === 'en_attente'
-                    ? `demande envoyée à ${SKIPPERS.find(sk => sk.id === getRequest(b.id).skipperId)?.name}, en attente`
-                    : 'skipper requis non assigné'}
-                </span>
-                <button className="btn-primary py-1 px-3 text-xs" onClick={() => setSelected(b)}>{getRequest(b.id)?.status === 'en_attente' ? 'Voir →' : 'Trouver →'}</button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onFindSkipper={() => navigate('/skippers')} onViewDocs={() => navigate('/bateaux')} onViewClientDocs={() => navigate('/clients')} onViewClient={() => { const c = CLIENTS.find(c => c.locations.includes(selected.id)); navigate(c ? `/clients?client=${c.id}` : '/clients') }} onBookingChange={() => forcePlanningUpdate(v => v + 1)} />}

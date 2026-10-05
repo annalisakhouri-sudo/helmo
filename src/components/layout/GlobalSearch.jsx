@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, Anchor, Users, UserCircle, Wrench, Sparkles, X } from 'lucide-react'
 import { BOOKINGS, BOATS, SKIPPERS, CLIENTS, TECHNICIANS, MENAGE_PROVIDERS } from '@/lib/mock-data'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 // Enlève accents et casse pour que "moreau", "Moreau" et "MÔREAU" matchent pareil.
 function norm(s) {
@@ -26,7 +27,7 @@ function search(query) {
     if (norm(b.client).includes(q) || norm(b.boatName).includes(q)) {
       results.push({
         type: 'booking', key: `b-${b.id}`, title: b.client,
-        subtitle: `${b.boatName} · ${b.start} → ${b.end}`,
+        subtitle: `${b.boatName} · ${fmtRange(b.start, b.end)}`,
         go: `/planning?highlight=${b.id}`,
       })
     }
@@ -38,8 +39,8 @@ function search(query) {
     if (norm(s.name).includes(q)) results.push({ type: 'skipper', key: `s-${s.id}`, title: s.name, subtitle: s.location || '', go: '/skippers' })
   })
   CLIENTS.forEach(c => {
-    if (norm(`${c.prenom} ${c.nom}`).includes(q) || norm(`${c.nom} ${c.prenom}`).includes(q)) {
-      results.push({ type: 'client', key: `c-${c.id}`, title: `${c.prenom} ${c.nom}`, subtitle: c.email || '', go: `/clients?client=${c.id}` })
+    if (norm(`${c.prenom} ${c.nom}`).includes(q) || norm(`${c.nom} ${c.prenom}`).includes(q) || norm(`${c.tel} ${c.email}`).replace(/\s/g, '').includes(q.replace(/\s/g, ''))) {
+      results.push({ type: 'client', key: `c-${c.id}`, title: `${c.prenom} ${c.nom}`, subtitle: c.tel || c.email || '', go: `/clients?client=${c.id}` })
     }
   })
   TECHNICIANS.forEach(t => {

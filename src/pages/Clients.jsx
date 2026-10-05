@@ -5,6 +5,7 @@ import { CLIENTS, BOOKINGS, BOATS, DOC_LABELS } from '@/lib/mock-data'
 import { Card, SectionLabel } from '@/components/ui'
 import FileUpload from '@/components/ui/FileUpload'
 import { getClientAlerts, getUrgentClientAlerts, updateClient, subscribeClients } from '@/lib/client-alerts'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 const PERMIS_TYPES = ['Côtier', 'Hauturier', 'Fluvial', 'Yachtmaster', 'Aucun']
 const CAUTION_MODES = ['CB', 'Chèque', 'Virement', 'Empreinte CB']
@@ -104,7 +105,7 @@ function BookingHistoryDetail({ booking, onClose }) {
         <div className="bg-navy-900 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="font-display text-white text-base font-bold">{booking.boatName}</h2>
-            <p className="text-navy-100 text-xs">{booking.start} → {booking.end}</p>
+            <p className="text-navy-100 text-xs">{fmtRange(booking.start, booking.end)}</p>
           </div>
           <button onClick={onClose} className="text-navy-100 hover:text-white"><X size={18} /></button>
         </div>
@@ -272,7 +273,7 @@ function ClientDetail({ client, onClose }) {
                   <div key={b.id} className="flex items-center gap-2.5 bg-gray-50 rounded-xl p-3 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setHistoryBooking(b)}>
                     <div className="flex-1">
                       <p className="text-xs font-medium">{b.boatName}</p>
-                      <p className="text-[10px] text-gray-400">{b.start} → {b.end}</p>
+                      <p className="text-[10px] text-gray-400">{fmtRange(b.start, b.end)}</p>
                     </div>
                     <ChevronRight size={13} className="text-gray-300" />
                   </div>
@@ -495,16 +496,7 @@ export default function Clients() {
       </div>
 
       <div className="flex-1 overflow-auto p-5">
-        <div className="relative mb-4">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Rechercher par nom, téléphone, email..."
-            className="w-full text-sm pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-navy-600"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+        {/* Recherche : la barre globale en haut de l'écran couvre déjà les clients (nom, téléphone…). */}
 
         {alerts.length > 0 && (
           <div className="mb-4">

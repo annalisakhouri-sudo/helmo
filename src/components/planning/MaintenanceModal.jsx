@@ -17,7 +17,7 @@ export function buildChecklist(boat, booking) {
   const isDayBoat = cabines === 0
 
   const sections = [
-    { category: '🔴 Sécurité', items: isDayBoat ? [
+    { category: 'Sécurité', items: isDayBoat ? [
       { id: 's1', label: 'Gilets de sauvetage', max: capacite },
       { id: 's3', label: 'Extincteur', max: 1 },
       { id: 's4', label: 'Trousse premiers secours', max: 1 },
@@ -30,19 +30,19 @@ export function buildChecklist(boat, booking) {
   ]
 
   if (!isDayBoat) {
-    sections.push({ category: '🍽 Cuisine', items: [
+    sections.push({ category: 'Cuisine', items: [
       { id: 'c1', label: 'Assiettes', max: capacite },
       { id: 'c2', label: 'Verres', max: capacite },
       { id: 'c3', label: 'Fourchettes', max: capacite },
       { id: 'c4', label: 'Couteaux', max: capacite },
     ]})
-    sections.push({ category: '🛏 Cabines', items: [
+    sections.push({ category: 'Cabines', items: [
       { id: 'b1', label: 'Oreillers', max: lits },
       { id: 'b2', label: 'Couvertures', max: lits },
     ]})
   }
 
-  sections.push({ category: '⚓ Nautique', items: isDayBoat ? [
+  sections.push({ category: 'Nautique', items: isDayBoat ? [
     { id: 'n1', label: 'Jerricane carburant', max: 1 },
     { id: 'n2', label: 'Fenders', max: 4 },
   ] : [
@@ -62,7 +62,7 @@ export function buildChecklist(boat, booking) {
     dynamicItems.push({ id: `opt-${optId}`, label: qty > 1 ? `${opt.label} × ${qty}` : opt.label, max: qty })
   })
   if (dynamicItems.length > 0) {
-    sections.push({ category: '🎒 Draps & options de cette location', items: dynamicItems })
+    sections.push({ category: 'Draps & options de cette location', items: dynamicItems })
   }
 
   return sections

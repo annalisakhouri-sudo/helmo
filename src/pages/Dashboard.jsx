@@ -8,6 +8,10 @@ import WeekendRotation from '@/components/dashboard/WeekendRotation'
 import BookingDetail from '@/components/planning/BookingDetail'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
 import { getState, subscribe } from '@/lib/shared-state'
+import { getRequest } from '@/lib/skipper-requests'
+import { getUnconfirmedMenages } from '@/lib/menage-missions'
+import { SKIPPERS } from '@/lib/mock-data'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 // Calcule le samedi de la semaine courante (ou égal si déjà samedi). Fiable, sans dépendance externe.
 function getSaturdayOnOrBefore(date) {
@@ -30,7 +34,11 @@ function isBookingComplete(b, boat) {
 
 function getBookingIssues(b, boat) {
   const issues = []
-  if (b.needsSkipper && !b.skipperId && !b.skipperName) issues.push({ severity: 'warn', msg: 'Skipper requis non assigné', to: '/skippers' })
+  if (b.needsSkipper && !b.skipperId && !b.skipperName) {
+    const req = getRequest(b.id)
+    const pending = req?.status === 'en_attente'
+    issues.push({ severity: 'warn', msg: pending ? `Skipper : demande envoyée à ${SKIPPERS.find(s => s.id === req.skipperId)?.name}, en attente` : 'Skipper à trouver', to: '/skippers' })
+  }
   if (boat) {
     Object.entries(boat.docs).forEach(([key, doc]) => {
       if (doc.status !== 'ok') issues.push({ severity: doc.status, msg: `${DOC_LABELS[key]} ${doc.status === 'danger' ? 'manquante' : doc.label.toLowerCase()}`, to: '/bateaux' })
@@ -46,7 +54,6 @@ function initials(name) {
 function MovementRow({ booking, date, type, onSelect }) {
   const accent = type === 'depart' ? '#1B4F8A' : '#0F7D57'
   const bg = type === 'depart' ? '#EEF2F7' : '#E2F5EF'
-  const isToday = date === format(TODAY, 'yyyy-MM-dd')
   return (
     <div
       className="flex items-center gap-3 pl-2 pr-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors border-l-2"
@@ -63,10 +70,7 @@ function MovementRow({ booking, date, type, onSelect }) {
         <p className="text-xs font-semibold truncate">{booking.client}</p>
         <p className="text-[11px] text-gray-400 truncate">{booking.boatName}</p>
       </div>
-      {isToday && <span className="text-[9px] font-bold uppercase text-white px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: accent }}>Aujourd'hui</span>}
-      <p className="text-[11px] font-medium capitalize flex-shrink-0" style={{ color: accent }}>
-        {format(parseISO(date), 'EEE d MMM', { locale: fr })}
-      </p>
+      <ChevronRight size={13} className="text-gray-300 flex-shrink-0" />
     </div>
   )
 }
@@ -77,6 +81,28 @@ function MovementRow({ booking, date, type, onSelect }) {
 function inWeek(dateStr, weekStart, weekEnd) {
   const d = parseISO(dateStr)
   return d >= weekStart && d < weekEnd
+}
+
+// Lignes groupées par date : la date s'affiche une fois en titre, pas sur chaque ligne.
+function GroupedRows({ items, dateKey, type, onSelect, accent }) {
+  const groups = []
+  items.forEach(b => {
+    const d = b[dateKey]
+    let g = groups[groups.length - 1]
+    if (!g || g.date !== d) { g = { date: d, items: [] }; groups.push(g) }
+    g.items.push(b)
+  })
+  const todayStr = format(TODAY, 'yyyy-MM-dd')
+  return groups.map(g => (
+    <div key={g.date} className="mb-1.5">
+      <p className="text-[10px] font-medium capitalize px-2 mb-1" style={{ color: accent }}>
+        {format(parseISO(g.date), 'EEEE d MMMM', { locale: fr })}{g.date === todayStr && " · aujourd'hui"}
+      </p>
+      <div className="flex flex-col gap-1">
+        {g.items.map(b => <MovementRow key={`${type}-${b.id}`} booking={b} date={g.date} type={type} onSelect={onSelect} />)}
+      </div>
+    </div>
+  ))
 }
 
 function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect }) {
@@ -105,9 +131,7 @@ function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect
             <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#1B4F8A' }}>Départs</p>
             <span className="text-[10px] text-gray-300">· {departs.length}</span>
           </div>
-          <div className="flex flex-col gap-1">
-            {departs.map(b => <MovementRow key={`d-${b.id}`} booking={b} date={b.start} type="depart" onSelect={onSelect} />)}
-          </div>
+          <GroupedRows items={departs} dateKey="start" type="depart" onSelect={onSelect} accent="#1B4F8A" />
         </div>
       )}
 
@@ -118,9 +142,7 @@ function WeekMovements({ title, subtitle, weekStart, weekEnd, bookings, onSelect
             <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#0F7D57' }}>Retours</p>
             <span className="text-[10px] text-gray-300">· {retours.length}</span>
           </div>
-          <div className="flex flex-col gap-1">
-            {retours.map(b => <MovementRow key={`r-${b.id}`} booking={b} date={b.end} type="retour" onSelect={onSelect} />)}
-          </div>
+          <GroupedRows items={retours} dateKey="end" type="retour" onSelect={onSelect} accent="#0F7D57" />
         </div>
       )}
     </div>
@@ -170,7 +192,15 @@ export default function Dashboard() {
     return { ...b, boat, issues, complete: issues.length === 0 }
   })
 
-  const incomplete = bookingsWithStatus.filter(b => !b.complete)
+  // « À traiter » : LA liste unique des alertes (le planning ne garde que les couleurs).
+  // = problèmes des locs de la semaine + skippers à trouver sur les semaines suivantes.
+  const thisWeek = bookingsWithStatus.filter(b => !b.complete)
+  const upcomingSkipper = bookings
+    .filter(b => !thisWeek.some(t => t.id === b.id) && parseISO(b.end) >= TODAY && b.needsSkipper && !b.skipperId && !b.skipperName)
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .map(b => ({ ...b, issues: getBookingIssues(b, null) }))
+  const incomplete = [...thisWeek, ...upcomingSkipper]
+  const refusedMenages = getUnconfirmedMenages(activeBrand).filter(m => m.requestStatus === 'refusee')
 
   // ── Rotation du week-end (samedi de la semaine en cours) ──
   const saturdayInPeriod = currentWeekStart
@@ -235,8 +265,8 @@ export default function Dashboard() {
               <AlertTriangle size={18} style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57' }} />
             </div>
             <div>
-              <p className="font-display text-2xl font-bold" style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57', lineHeight: 1.1 }}>{incomplete.length}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Location{incomplete.length > 1 ? 's' : ''} à régler</p>
+              <p className="font-display text-2xl font-bold" style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57', lineHeight: 1.1 }}>{incomplete.length + refusedMenages.length}</p>
+              <p className="text-xs text-gray-400 mt-0.5">À traiter</p>
             </div>
           </div>
         </div>
@@ -245,10 +275,20 @@ export default function Dashboard() {
         <WeekendRotation saturday={saturdayInPeriod} returningBookings={returningBookings} onSelect={handleRotationSelect} />
 
         {/* Alertes uniquement — ce qui bloque vraiment */}
-        {incomplete.length > 0 && (
+        {(incomplete.length > 0 || refusedMenages.length > 0) && (
           <div className="mb-6">
-            <p className="section-label">À régler cette semaine</p>
+            <p className="section-label">À traiter</p>
             <div className="flex flex-col gap-2">
+              {refusedMenages.map(m => (
+                <div key={m.key} className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/menage')}>
+                  <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate text-amber-800">{m.boat} — {m.client}</p>
+                    <p className="text-xs text-amber-700">Ménage refusé par {m.providerName} · choisir une autre société</p>
+                  </div>
+                  <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Voir →</span>
+                </div>
+              ))}
               {incomplete.map(b => (
                 <div
                   key={b.id}
@@ -257,7 +297,7 @@ export default function Dashboard() {
                 >
                   <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate text-amber-800">{b.boatName} — {b.client}</p>
+                    <p className="text-xs font-semibold truncate text-amber-800">{b.boatName} — {b.client} <span className="font-normal text-amber-600">· {format(parseISO(b.start), 'd MMM', { locale: fr })}</span></p>
                     <p className="text-xs text-amber-700">{b.issues.map(i => i.msg).join(' · ')}</p>
                   </div>
                   <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Voir →</span>
@@ -281,7 +321,7 @@ export default function Dashboard() {
                   <Euro size={14} className="text-navy-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold truncate text-navy-800">{b.boatName} — {b.client}</p>
-                    <p className="text-xs text-navy-700">Facture envoyée le {invoice.sentAt} · pas encore réglée</p>
+                    <p className="text-xs text-navy-700">Facture envoyée le {fmtDate(invoice.sentAt)} · pas encore réglée</p>
                   </div>
                   <span className="text-[10px] text-navy-600 font-medium whitespace-nowrap">Voir →</span>
                 </div>

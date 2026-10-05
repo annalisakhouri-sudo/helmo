@@ -12,23 +12,12 @@ import { getTotalUnread, subscribeMessages } from '@/lib/messaging'
 
 const NAV = [
   {
-    section: 'Pilotage',
+    section: 'Au quotidien',
     items: [
       { to: '/', label: 'Vue d\'ensemble', icon: LayoutDashboard },
       { to: '/planning', label: 'Planning', icon: Calendar },
-    ],
-  },
-  {
-    section: 'Locations',
-    items: [
       { to: '/clients', label: 'Clients', icon: UserCircle, badge: 'clientAlerts' },
-      { to: '/options', label: 'Options & tarifs', icon: Tag },
-    ],
-  },
-  {
-    section: 'Flotte',
-    items: [
-      { to: '/bateaux', label: 'Mes bateaux', icon: Anchor },
+      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle, badge: 'messages' },
     ],
   },
   {
@@ -37,7 +26,14 @@ const NAV = [
       { to: '/skippers', label: 'Skippers', icon: Users },
       { to: '/techniciens', label: 'Techniciens', icon: Wrench },
       { to: '/menage', label: 'Ménage', icon: Sparkles },
-      { to: '/messagerie', label: 'Messagerie', icon: MessageCircle, badge: 'messages' },
+    ],
+  },
+  // Réglés une fois en début de saison : rangés en bas pour ne pas encombrer.
+  {
+    section: 'Réglages',
+    items: [
+      { to: '/bateaux', label: 'Mes bateaux', icon: Anchor },
+      { to: '/options', label: 'Options & tarifs', icon: Tag },
     ],
   },
 ]

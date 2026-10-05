@@ -4,6 +4,7 @@ import { buildInvoiceData } from '@/lib/invoice'
 import { downloadInvoicePdf } from '@/lib/invoice-pdf'
 import { getInvoice, updateInvoiceLineItem, updateInvoiceNotes, sendInvoice, markInvoicePaid, getInvoiceTemplate, subscribe } from '@/lib/shared-state'
 import InvoiceSheet from './InvoiceSheet'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 export default function InvoiceModal({ booking, onClose }) {
   const [, forceUpdate] = useState(0)
@@ -35,9 +36,9 @@ export default function InvoiceModal({ booking, onClose }) {
       <div className="bg-gray-50 rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2 flex-shrink-0">
           {isPaid ? (
-            <><CircleCheck size={16} className="text-teal-600" /><span className="text-xs font-medium text-teal-700">Payée le {invoice.paidAt}</span></>
+            <><CircleCheck size={16} className="text-teal-600" /><span className="text-xs font-medium text-teal-700">Payée le {fmtDate(invoice.paidAt)}</span></>
           ) : isSent ? (
-            <><Euro size={16} className="text-amber-600" /><span className="text-xs font-medium text-amber-700">Envoyée le {invoice.sentAt} — en attente de paiement</span></>
+            <><Euro size={16} className="text-amber-600" /><span className="text-xs font-medium text-amber-700">Envoyée le {fmtDate(invoice.sentAt)} — en attente de paiement</span></>
           ) : (
             <><Receipt size={14} className="text-gray-400" /><span className="text-xs text-gray-500">Brouillon — les montants sont modifiables</span></>
           )}

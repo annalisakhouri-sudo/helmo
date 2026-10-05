@@ -42,10 +42,10 @@ function MenageStatusCard({ mission }) {
 }
 
 const CHECKLIST_ITEMS = [
-  { category:'🔴 Sécurité', items:[{id:'c1',label:'Gilets de sauvetage (x6)'},{id:'c2',label:'Fusées de détresse'},{id:'c3',label:'Extincteur'},{id:'c4',label:'Balise EPIRB'},{id:'c5',label:'Trousse premiers secours'}]},
-  { category:'🍽 Cuisine', items:[{id:'c6',label:'Assiettes & couverts'},{id:'c7',label:'Verres & tasses'},{id:'c8',label:'Casseroles & poêles'},{id:'c9',label:'Ouvre-boîte & tire-bouchon'}]},
-  { category:'🛏 Cabines', items:[{id:'c10',label:'Oreillers'},{id:'c11',label:'Couvertures'},{id:'c12',label:'Papier toilette & produits'}]},
-  { category:'⚓ Nautique', items:[{id:'c13',label:'Jerricane carburant (plein)'},{id:'c14',label:'Fenders & aussières'},{id:'c15',label:'Annexe & pagaies'}]},
+  { category:'Sécurité', items:[{id:'c1',label:'Gilets de sauvetage (x6)'},{id:'c2',label:'Fusées de détresse'},{id:'c3',label:'Extincteur'},{id:'c4',label:'Balise EPIRB'},{id:'c5',label:'Trousse premiers secours'}]},
+  { category:'Cuisine', items:[{id:'c6',label:'Assiettes & couverts'},{id:'c7',label:'Verres & tasses'},{id:'c8',label:'Casseroles & poêles'},{id:'c9',label:'Ouvre-boîte & tire-bouchon'}]},
+  { category:'Cabines', items:[{id:'c10',label:'Oreillers'},{id:'c11',label:'Couvertures'},{id:'c12',label:'Papier toilette & produits'}]},
+  { category:'Nautique', items:[{id:'c13',label:'Jerricane carburant (plein)'},{id:'c14',label:'Fenders & aussières'},{id:'c15',label:'Annexe & pagaies'}]},
 ]
 
 // ── Modal Fiche Bateau ────────────────────────────────────────────
@@ -186,7 +186,7 @@ function CheckInModal({ mission, bookingId, booking, onClose, onComplete }) {
     dynamicItems.push({ id: `opt-${optId}`, label: qty ? `${opt.label} × ${qty}` : opt.label })
   })
   const checklistItems = dynamicItems.length > 0
-    ? [...CHECKLIST_ITEMS, { category: '🎒 Draps & options de cette location', items: dynamicItems }]
+    ? [...CHECKLIST_ITEMS, { category: 'Draps & options de cette location', items: dynamicItems }]
     : CHECKLIST_ITEMS
   const allItems = checklistItems.flatMap(c => c.items)
 

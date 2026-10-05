@@ -3,6 +3,7 @@ import { X, FileText, Download, Send, CircleCheck, RefreshCw, AlertTriangle } fr
 import { BOATS, CONTRACT_TEMPLATES } from '@/lib/mock-data'
 import { buildContractContent, getDefaultTemplateId } from '@/lib/contract'
 import { getContract, setContractTemplate, updateContractContent, sendContract, markContractSigned, subscribe } from '@/lib/shared-state'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 const TODAY = new Date('2026-07-04')
 
@@ -72,7 +73,7 @@ export default function ContractModal({ booking, onClose }) {
           ) : isSent ? (
             <div className="flex items-center gap-2">
               <CircleCheck size={16} className="text-navy-600" />
-              <span className="text-xs font-medium text-navy-700">Envoyé au client le {contract.sentAt}</span>
+              <span className="text-xs font-medium text-navy-700">Envoyé au client le {fmtDate(contract.sentAt)}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">

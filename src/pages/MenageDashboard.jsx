@@ -7,51 +7,6 @@ import { getMissionsForProvider, getPendingRequestsForProvider, getProviderByAcc
 import { getState, subscribe, toggleMenageDone, respondMenageRequest } from '@/lib/shared-state'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
-const STATUS_PILL = {
-  prevu: { label: 'À venir', cls: 'bg-gray-100 text-gray-500' },
-  fait: { label: 'En attente de paiement', cls: 'bg-amber-50 text-amber-700' },
-  regle: { label: 'Réglé', cls: 'bg-teal-50 text-teal-700' },
-}
-const LIST_TITLES = { all: 'Toutes les factures', faits: 'Factures des ménages faits', prevu: 'Factures à venir (ménages pas encore faits)' }
-
-// Liste de factures derrière chaque case du haut : toutes / faits / restant à faire.
-function InvoiceListModal({ filter, missions, showAgency, onClose, onOpenInvoice }) {
-  const list = missions.filter(m => filter === 'all' ? true : filter === 'faits' ? m.done : !m.done)
-  const total = list.reduce((n, m) => n + m.amount, 0)
-  return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-navy-900 px-6 py-4 flex items-center justify-between flex-shrink-0">
-          <div>
-            <h2 className="font-display text-white text-base font-bold">{LIST_TITLES[filter]}</h2>
-            <p className="text-navy-100 text-xs">{list.length} facture{list.length > 1 ? 's' : ''} · {total}€</p>
-          </div>
-          <button onClick={onClose} className="text-navy-100 hover:text-white"><X size={18} /></button>
-        </div>
-        <div className="flex-1 overflow-auto p-4 flex flex-col gap-2">
-          {list.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Aucune facture ici pour l'instant.</p>}
-          {list.map(m => {
-            const pill = STATUS_PILL[m.status]
-            return (
-              <button key={m.key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 text-left transition-colors" onClick={() => onOpenInvoice(m)}>
-                <Receipt size={15} className="text-navy-600 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{m.boat}</p>
-                  <p className="text-[11px] text-gray-400 truncate">
-                    {format(parseISO(m.date), 'EEE d MMM', { locale: fr })} · {m.client}{showAgency ? ` · ${m.agencyName}` : ''}
-                  </p>
-                </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${pill.cls}`}>{pill.label}</span>
-                <p className="text-sm font-medium text-navy-900 flex-shrink-0 w-12 text-right">{m.amount}€</p>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function CodeLogin({ onSuccess }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
@@ -92,10 +47,8 @@ function CodeLogin({ onSuccess }) {
 
 export default function MenageDashboard({ onLogout }) {
   const [providerId, setProviderId] = useState(null)
-  const [view, setView] = useState('planning')
-  const [reportTab, setReportTab] = useState('fait') // 'prevu' | 'fait' | 'regle'
+  const [filter, setFilter] = useState('prevu') // 'prevu' | 'fait' | 'regle'
   const [invoiceMission, setInvoiceMission] = useState(null)
-  const [invoiceList, setInvoiceList] = useState(null) // null | 'all' | 'faits' | 'prevu'
   const [sharedState, setSharedState] = useState(getState())
   useEffect(() => subscribe(s => setSharedState(s)), [])
 
@@ -108,11 +61,14 @@ export default function MenageDashboard({ onLogout }) {
   const pct = missions.length ? Math.round((done / missions.length) * 100) : 0
   const agencyGroups = groupMissionsByAgency(missions)
   const multiAgency = agencyGroups.length > 1
-  const REPORT_TABS = [
+  const FILTERS = [
     { id: 'prevu', label: 'À venir' },
-    { id: 'fait', label: 'En attente de paiement' },
+    { id: 'fait', label: 'À régler' },
     { id: 'regle', label: 'Réglés' },
   ]
+  const counts = { prevu: 0, fait: 0, regle: 0 }
+  missions.forEach(m => { counts[m.status]++ })
+  const filtered = missions.filter(m => m.status === filter)
   const owedTotal = missions.filter(m => m.status === 'fait').reduce((n, m) => n + m.amount, 0)
   const paidTotal = missions.filter(m => m.status === 'regle').reduce((n, m) => n + m.amount, 0)
 
@@ -173,12 +129,9 @@ export default function MenageDashboard({ onLogout }) {
           <div className="flex items-center gap-1.5 text-[10px] text-navy-100 opacity-70"><Phone size={10} /> {provider.phone}</div>
           <div className="flex items-center gap-1.5 text-[10px] text-navy-100 opacity-70 mt-0.5"><Mail size={10} /> {provider.email}</div>
         </div>
-        <button className={`flex items-center gap-2 px-4 py-2.5 text-xs transition-colors ${view === 'planning' ? 'bg-navy-800 text-white' : 'text-navy-100 hover:bg-navy-800'}`} onClick={() => setView('planning')}>
-          <Calendar size={13} /> Mon planning
-        </button>
-        <button className={`flex items-center gap-2 px-4 py-2.5 text-xs transition-colors ${view === 'rapport' ? 'bg-navy-800 text-white' : 'text-navy-100 hover:bg-navy-800'}`} onClick={() => setView('rapport')}>
-          <Receipt size={13} /> Compte rendu
-        </button>
+        <div className="flex items-center gap-2 px-4 py-2.5 text-xs bg-navy-800 text-white">
+          <Calendar size={13} /> Mes ménages
+        </div>
         <button className="flex items-center gap-2 px-4 py-2.5 text-xs text-navy-100 hover:bg-navy-800 transition-colors" onClick={() => setProviderId(null)}>
           <ChevronLeft size={13} /> Changer de compte
         </button>
@@ -194,15 +147,13 @@ export default function MenageDashboard({ onLogout }) {
       <main className="flex-1 overflow-auto print:overflow-visible">
         <div className="topbar bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between print:hidden">
           <div>
-            <h1 className="font-display text-base font-bold">{view === 'planning' ? 'Mon planning ménage' : 'Compte rendu'}</h1>
-            <p className="text-xs text-gray-400">{missions.length} mission{missions.length > 1 ? 's' : ''} · {pct}% faits</p>
+            <h1 className="font-display text-base font-bold">Mes ménages</h1>
+            <p className="text-xs text-gray-400">{counts.prevu} à venir · <span className="text-amber-700">{owedTotal}€ à régler</span> · <span className="text-teal-700">{paidTotal}€ réglés</span></p>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="btn-ghost text-xs" onClick={() => window.print()}><Printer size={13} /> Imprimer</button>
-          </div>
+          <button className="btn-ghost text-xs" onClick={() => window.print()}><Printer size={13} /> Imprimer</button>
         </div>
 
-        {view === 'planning' && pendingRequests.length > 0 && (
+        {pendingRequests.length > 0 && (
           <div className="px-6 pt-5 max-w-2xl print:hidden">
             <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-2">Nouvelles demandes à confirmer ({pendingRequests.length})</p>
             <div className="flex flex-col gap-2">
@@ -228,122 +179,40 @@ export default function MenageDashboard({ onLogout }) {
           </div>
         )}
 
-        {view === 'planning' && missions.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 px-6 pt-5 max-w-2xl print:hidden">
-            {[
-              { id: 'all', value: missions.length, label: 'missions au total', color: 'text-navy-900', border: 'border-gray-100 hover:bg-gray-50' },
-              { id: 'faits', value: done, label: 'faits', color: 'text-teal-600', border: 'border-teal-100 hover:bg-teal-50' },
-              { id: 'prevu', value: missions.length - done, label: 'restant à faire', color: 'text-amber-600', border: 'border-amber-100 hover:bg-amber-50' },
-            ].map(c => (
-              <button key={c.id} className={`bg-white rounded-xl border p-3.5 text-center transition-colors ${c.border}`} onClick={() => setInvoiceList(c.id)}>
-                <p className={`font-display text-xl font-bold ${c.color}`}>{c.value}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{c.label} · voir les factures →</p>
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Un seul écran, trois filtres : à faire → à se faire payer → réglé */}
+        <div className="flex gap-1.5 px-6 pt-5 max-w-2xl print:hidden">
+          {FILTERS.map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filter === f.id ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+              {f.label} ({counts[f.id]})
+            </button>
+          ))}
+        </div>
 
-        <div className="p-6 max-w-2xl">
-          {view === 'planning' ? (
-            missions.length === 0 ? (
-              <div className="bg-white rounded-xl p-8 text-center border border-gray-100">
-                <p className="text-sm text-gray-400">Aucun ménage assigné pour le moment.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-7">
-                {agencyGroups.map(ag => (
-                  <div key={ag.agencyName}>
-                    {multiAgency && (
-                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
-                        <Building2 size={14} className="text-navy-600" />
-                        <p className="text-sm font-semibold text-navy-800">{ag.agencyName}</p>
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-6">
-                      {weekGroups(ag.items).map(g => (
-                        <div key={g.weekStart}>
-                          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                            Semaine du {format(parseISO(g.weekStart), 'd MMMM', { locale: fr })}
-                          </p>
-                          <div className="flex flex-col gap-2">
-                            {g.items.map(m => <MissionRow key={m.key} m={m} />)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
+        <div className="p-6 pt-4 max-w-2xl">
+          {filtered.length === 0 ? (
+            <div className="bg-white rounded-xl p-8 text-center border border-gray-100">
+              <p className="text-sm text-gray-400">{filter === 'prevu' ? 'Aucun ménage à venir.' : filter === 'fait' ? 'Rien en attente de paiement.' : 'Aucun ménage réglé pour le moment.'}</p>
+            </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white rounded-xl border border-amber-100 p-3.5">
-                  <p className="font-display text-xl font-bold text-amber-600">{owedTotal}€</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">en attente de paiement</p>
-                </div>
-                <div className="bg-white rounded-xl border border-teal-100 p-3.5">
-                  <p className="font-display text-xl font-bold text-teal-600">{paidTotal}€</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">déjà réglés</p>
-                </div>
-              </div>
-
-              <div className="flex gap-1.5 print:hidden">
-                {REPORT_TABS.map(t => (
-                  <button key={t.id} onClick={() => setReportTab(t.id)} className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${reportTab === t.id ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                    {t.label} ({missions.filter(m => m.status === t.id).length})
-                  </button>
-                ))}
-              </div>
-
-              {agencyGroups.map(ag => {
-                const items = ag.items.filter(m => m.status === reportTab)
-                const total = items.reduce((n, m) => n + m.amount, 0)
-                return (
-                  <div key={ag.agencyName} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50">
-                      <Building2 size={14} className="text-navy-600" />
-                      <p className="text-sm font-semibold text-navy-800 flex-1">{ag.agencyName}</p>
-                      <p className="text-sm font-bold text-navy-900">{total}€</p>
-                    </div>
-                    {items.length === 0 ? (
-                      <p className="text-xs text-gray-400 px-4 py-4">Rien dans cette catégorie pour cette agence.</p>
-                    ) : (
-                      <div className="divide-y divide-gray-50">
-                        {items.map(m => (
-                          <div key={m.key} className="flex items-center gap-3 px-4 py-2.5">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{m.boat}</p>
-                              <p className="text-[11px] text-gray-400">
-                                {format(parseISO(m.date), 'EEE d MMM', { locale: fr })} · {m.client}
-                                {m.status === 'regle' && <> · <span className="text-teal-700">{paidLabel(m)}</span></>}
-                              </p>
-                            </div>
-                            <p className="text-sm font-medium text-navy-900 flex-shrink-0">{m.amount}€</p>
-                            <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1 print:hidden" onClick={() => setInvoiceMission(m)}>
-                              <Receipt size={10} /> Facture
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+            <div className="flex flex-col gap-5">
+              {filter !== 'prevu' && (
+                <p className="text-xs text-gray-500">Total : <strong className="text-navy-900">{filtered.reduce((n, m) => n + m.amount, 0)}€</strong></p>
+              )}
+              {weekGroups(filtered).map(g => (
+                <div key={g.weekStart}>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    Semaine du {format(parseISO(g.weekStart), 'd MMMM', { locale: fr })}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {g.items.map(m => <MissionRow key={m.key} m={m} />)}
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </main>
 
-      {invoiceList && (
-        <InvoiceListModal
-          filter={invoiceList}
-          missions={missions}
-          showAgency={multiAgency}
-          onClose={() => setInvoiceList(null)}
-          onOpenInvoice={setInvoiceMission}
-        />
-      )}
       {invoiceMission && (
         <MenageInvoiceModal mission={invoiceMission} editable={false} onClose={() => setInvoiceMission(null)} />
       )}

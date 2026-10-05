@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Sparkles, Phone, Mail, Check, ChevronRight, X, Building2, Copy, Receipt, CreditCard } from 'lucide-react'
+import { Sparkles, Phone, Mail, Check, ChevronRight, X, Copy, Receipt, CreditCard } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
@@ -193,24 +193,13 @@ export default function Menage() {
       </div>
 
       <div className="flex-1 overflow-auto p-5">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
-            <p className="font-display text-xl font-bold text-navy-900">{upcoming.length}</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">ménages à venir</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 p-3.5 text-center">
-            <p className="font-display text-xl font-bold text-teal-600">{allMissions.length - upcoming.length}</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">ménages faits</p>
-          </div>
-          <button className="bg-white rounded-xl border border-amber-100 p-3.5 text-center hover:bg-amber-50 transition-colors" onClick={() => setShowPayments(true)}>
-            <p className="font-display text-xl font-bold text-amber-600">{toPayAmount}€</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">à régler · {toPay.length} facture{toPay.length > 1 ? 's' : ''} →</p>
+        <div className="flex items-center gap-3 mb-4 text-sm">
+          <span className="text-gray-500"><strong className="text-navy-900">{upcoming.length}</strong> à venir</span>
+          <span className="text-gray-300">·</span>
+          <span className="text-gray-500"><strong className="text-teal-600">{allMissions.length - upcoming.length}</strong> faits</span>
+          <button className="ml-auto flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-100 hover:bg-amber-100" onClick={() => setShowPayments(true)}>
+            <Receipt size={12} /> {toPayAmount}€ à régler · {toPay.length} facture{toPay.length > 1 ? 's' : ''} →
           </button>
-        </div>
-
-        <div className="mb-4 rounded-xl border border-navy-100 bg-navy-50 p-3 flex items-center gap-2.5">
-          <Building2 size={14} className="text-navy-600 flex-shrink-0" />
-          <p className="text-xs text-navy-700">Chaque ménage suit le même circuit : <strong>prévu → fait → réglé</strong>. « À régler » = ménages faits pas encore payés.</p>
         </div>
 
         {unconfirmed.length > 0 && (

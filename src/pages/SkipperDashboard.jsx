@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, X, Check, Send, LogOut } from 'lucide-react'
 import { SkipperSidebar } from '@/components/layout/SkipperLayout'
 import { getRequestsForSkipper, respondSkipperRequest, subscribeSkipperRequests } from '@/lib/skipper-requests'
 import { getThread, sendMessage as storeSend, subscribeMessages, markRead, getUnread } from '@/lib/messaging'
+import { fmtDate, fmtRange } from '@/lib/dates'
 
 // Le skipper connecté en démo = Jean-Marc Rossi (skip-1 dans les données).
 const SKIPPER_ID = 'skip-1'
@@ -164,7 +165,7 @@ function MissionDetail({ mission, onClose }) {
         <div className="bg-navy-900 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="font-display text-white text-base font-bold">{mission.boat}</h2>
-            <p className="text-navy-100 text-xs">{mission.agency} · {mission.start} → {mission.end}</p>
+            <p className="text-navy-100 text-xs">{mission.agency} · {fmtRange(mission.start, mission.end)}</p>
           </div>
           <button onClick={onClose} className="text-navy-100 hover:text-white"><X size={18}/></button>
         </div>
@@ -424,7 +425,7 @@ export default function SkipperDashboard({ onLogout }) {
                       <span className="text-xs font-medium px-2.5 py-0.5 rounded-full" style={{background:s.bg,color:s.text}}>{s.label}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-400">{m.start} → {m.end} · {m.days}j</p>
+                      <p className="text-xs text-gray-400">{fmtRange(m.start, m.end)} · {m.days}j</p>
                       <p className="text-sm font-bold" style={{color:m.status==='done'?(m.paid?'#0F6E56':'#A32D2D'):'#185FA5'}}>{m.amount}€</p>
                     </div>
                   </div>
