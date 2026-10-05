@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Calendar, DollarSign, Phone, Clock, MessageCircle, LogOut } from 'lucide-react'
+import { Calendar, DollarSign, Phone, Clock, MessageCircle, LogOut, Users, Repeat } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV_SKIPPER = [
@@ -90,8 +90,9 @@ export function TechSidebar({ tech, onLogout, activeView, setView }) {
 
       <nav className="flex-1 min-h-0 overflow-y-auto pt-2">
         {[
-          { id: 'equipe', label: 'Équipe', icon: Calendar },
-        { id: 'planning', label: 'Mon planning', icon: Calendar },
+          { id: 'planning', label: 'Mon planning', icon: Calendar },
+          { id: 'equipe', label: 'Équipe', icon: Users },
+          { id: 'switch', label: 'Changer de technicien', icon: Repeat },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}

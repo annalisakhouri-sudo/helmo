@@ -18,12 +18,14 @@ BOOKINGS.forEach(b => {
   const paid = b.end < addDays(TODAY, -14)
   invoices[b.id] = { data: null, status: paid ? 'payee' : 'envoyee', sentAt: addDays(b.start, -10), paidAt: paid ? addDays(b.end, 3) : null }
 
-  if (b.options?.menage && b.end < TODAY) {
+  // Date du ménage : jour du retour, ou la veille si le client libère le vendredi soir.
+  const menageDate = b.start !== b.end && b.lastNightAboard === false ? addDays(b.end, -1) : b.end
+  if (b.options?.menage && menageDate < TODAY) {
     const key = `menage-${b.id}`
     const provider = getDefaultMenageForBoat(b.boatId) || MENAGE_PROVIDERS[0]
     menageDone[key] = true
-    menageDoneMeta[key] = { type: 'provider', name: provider.company, at: `${b.end}T17:${b.id.length % 6}0:00` }
-    if (b.end < addDays(TODAY, -7)) menageInvoices[key] = { data: null, status: 'payee', paidAt: addDays(b.end, 5), paidVia: 'manuel' }
+    menageDoneMeta[key] = { type: 'provider', name: provider.company, at: `${menageDate}T17:${b.id.length % 6}0:00` }
+    if (menageDate < addDays(TODAY, -7)) menageInvoices[key] = { data: null, status: 'payee', paidAt: addDays(b.end, 5), paidVia: 'manuel' }
   }
 })
 

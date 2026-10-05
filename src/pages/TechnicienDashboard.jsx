@@ -631,17 +631,21 @@ function TechMission({ tech, mission, tasks, onBack, onToggle, sharedState }) {
 
 // ── Dashboard principal ───────────────────────────────────────────
 export default function TechnicienDashboard({ onLogout }) {
+  // Qui est connecté : choisi à l'arrivée (en production : connexion par téléphone + code SMS).
+  const [me, setMe] = useState(null)
   const [selectedTech, setSelectedTechState] = useState(null)
   const [selectedMission, setSelectedMission] = useState(null)
-  const [activeView, setActiveViewState] = useState('equipe')
-  // Technicien connecté en démo = Karim (tech-1). « Mon planning » ouvre SON planning
-  // (avant, le bouton ne faisait rien tant qu'aucun technicien n'était sélectionné).
-  const ME = 'tech-1'
+  const [activeView, setActiveViewState] = useState('planning')
   const setSelectedTech = id => setSelectedTechState(id)
   const setActiveView = v => {
+    if (v === 'switch') { setMe(null); setSelectedTechState(null); setSelectedMission(null); setActiveViewState('planning'); return }
     setActiveViewState(v)
-    if (v === 'planning' && !selectedTech) setSelectedTechState(ME)
-    if (v === 'equipe') { setSelectedTechState(null); setSelectedMission(null) }
+    setSelectedMission(null)
+    if (v === 'planning') setSelectedTechState(me) // « Mon planning » = toujours le mien
+    if (v === 'equipe') setSelectedTechState(null)
+  }
+  function login(id) {
+    setMe(id); setSelectedTechState(id); setActiveViewState('planning')
   }
   const [sharedState, setSharedState] = useState(getState())
 
@@ -649,6 +653,34 @@ export default function TechnicienDashboard({ onLogout }) {
 
   const tech = TECH_META.find(t=>t.id===selectedTech)
   const missions = selectedTech ? getTechMissions(selectedTech) : []
+
+  if (!me) {
+    return (
+      <div className="min-h-screen bg-navy-900 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+          <p className="font-display text-lg font-bold mb-1">Qui êtes-vous ?</p>
+          <p className="text-xs text-gray-400 mb-4">Choisis ton nom pour voir tes missions.</p>
+          <div className="flex flex-col gap-2">
+            {TECH_META.map(t => {
+              const next = getTechMissions(t.id).filter(m => m.date >= '2026-07-04').length
+              return (
+                <button key={t.id} onClick={() => login(t.id)} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-navy-200 hover:bg-navy-50 text-left transition-colors">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: t.color }}>{t.initials}</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{t.name}</p>
+                    <p className="text-[11px] text-gray-400">{t.base} · {next} missions à venir</p>
+                  </div>
+                  <ChevronRight size={14} className="text-gray-300" />
+                </button>
+              )
+            })}
+          </div>
+          <button className="text-xs text-gray-400 mt-4 hover:text-navy-600" onClick={onLogout}>← Retour</button>
+        </div>
+      </div>
+    )
+  }
+  const meMeta = TECH_META.find(t => t.id === me)
 
   function handleToggle(techId, missionId, taskId) {
     toggleTask(techId, missionId, taskId)
@@ -660,7 +692,7 @@ export default function TechnicienDashboard({ onLogout }) {
     const tasks = sharedState.techTasks[tech.id]?.[mission.id] || []
     return (
       <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
-        <TechSidebar tech={tech} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
+        <TechSidebar tech={meMeta} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
         <main className="flex-1 flex flex-col overflow-hidden">
           <TechMission tech={tech} mission={mission} tasks={tasks} sharedState={sharedState}
             onBack={()=>setSelectedMission(null)} onToggle={taskId=>handleToggle(tech.id,mission.id,taskId)}/>
@@ -673,7 +705,7 @@ export default function TechnicienDashboard({ onLogout }) {
   if(selectedTech && tech && activeView==='planning') {
     return (
       <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
-        <TechSidebar tech={tech} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
+        <TechSidebar tech={meMeta} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
         <main className="flex-1 flex flex-col overflow-hidden">
           <TechPlanning tech={tech} missions={missions} sharedState={sharedState} onSelectMission={setSelectedMission}/>
         </main>
@@ -685,7 +717,7 @@ export default function TechnicienDashboard({ onLogout }) {
   if(selectedTech && tech) {
     return (
       <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
-        <TechSidebar tech={tech} onLogout={onLogout} activeView={activeView} setView={v=>{setActiveView(v)}}/>
+        <TechSidebar tech={meMeta} onLogout={onLogout} activeView={activeView} setView={v=>{setActiveView(v)}}/>
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="topbar">
             <div className="flex items-center gap-2">
@@ -732,7 +764,7 @@ export default function TechnicienDashboard({ onLogout }) {
   // Vue liste équipe
   return (
     <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">
-      <TechSidebar tech={TECH_META[0]} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
+      <TechSidebar tech={meMeta} onLogout={onLogout} activeView={activeView} setView={setActiveView}/>
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="topbar"><div><h1 className="font-display text-base font-bold">Équipe</h1><p className="text-xs text-gray-400">{TECH_META.length} techniciens</p></div></div>
         <div className="flex-1 overflow-auto p-5">

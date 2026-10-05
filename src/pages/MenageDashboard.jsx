@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Printer, Receipt, Calendar, Building2 } from 'lucide-react'
+import { X, ChevronRight, LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Printer, Receipt, Calendar, Building2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
@@ -48,6 +48,8 @@ function CodeLogin({ onSuccess }) {
 export default function MenageDashboard({ onLogout }) {
   const [providerId, setProviderId] = useState(null)
   const [filter, setFilter] = useState('prevu') // 'prevu' | 'fait' | 'regle'
+  const [detailKey, setDetailKey] = useState(null)
+  const [toast, setToast] = useState(null)
   const [invoiceMission, setInvoiceMission] = useState(null)
   const [sharedState, setSharedState] = useState(getState())
   useEffect(() => subscribe(s => setSharedState(s)), [])
@@ -82,32 +84,41 @@ export default function MenageDashboard({ onLogout }) {
     return groups
   }
 
+  // Cocher « fait » range le ménage dans « À régler » : on le dit, avec un Annuler.
+  function toggleDone(m) {
+    if (m.status === 'regle') return // un ménage réglé ne se décoche plus
+    const wasDone = m.done
+    toggleMenageDone(m.key, { type: 'provider', name: provider.company })
+    setToast({ key: m.key, text: wasDone ? `${m.boat} : remis dans « À venir »` : `${m.boat} : fait ✓ — rangé dans « À régler »` })
+    clearTimeout(window.__menageToast)
+    window.__menageToast = setTimeout(() => setToast(null), 5000)
+  }
+
   function MissionRow({ m }) {
     const isFriday = m.heure === '17:30'
-    // Un ménage déjà réglé ne se décoche plus.
-    const toggle = () => { if (m.status !== 'regle') toggleMenageDone(m.key, { type: 'provider', name: provider.company }) }
     return (
-      <div className={`flex items-center gap-3 p-3.5 rounded-xl border transition-colors ${m.done ? 'bg-teal-50 border-teal-100' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
-        <div
-          className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer ${m.done ? 'bg-teal-400' : 'border-2 border-gray-300 bg-white'}`}
-          onClick={toggle}
+      <div className={`flex items-center gap-3 p-3.5 rounded-xl border transition-colors cursor-pointer ${m.done ? 'bg-teal-50 border-teal-100' : 'bg-white border-gray-100 hover:border-navy-200'}`} onClick={() => setDetailKey(m.key)}>
+        <button
+          title={m.status === 'regle' ? 'Déjà réglé' : m.done ? 'Annuler' : 'Marquer comme fait'}
+          className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${m.done ? 'bg-teal-400' : 'border-2 border-gray-300 bg-white hover:border-teal-400'}`}
+          onClick={e => { e.stopPropagation(); toggleDone(m) }}
         >
-          {m.done && <Check size={12} className="text-white" />}
-        </div>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={toggle}>
+          {m.done && <Check size={13} className="text-white" />}
+        </button>
+        <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium ${m.done ? 'text-teal-800' : 'text-gray-800'}`}>{m.boat}</p>
           <p className="text-xs text-gray-400">{m.client} · {format(parseISO(m.date), 'EEEE d MMM', { locale: fr })} · {m.heure}</p>
           {m.done && <p className="text-[10px] text-teal-700 mt-0.5">{m.status === 'regle' ? paidLabel(m) : doneByLabel(m)}</p>}
         </div>
-        <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1" onClick={() => setInvoiceMission(m)}>
-          <Receipt size={10} /> Facture
-        </button>
         {isFriday && !m.done && (
           <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full flex-shrink-0">Vendredi soir</span>
         )}
+        <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
       </div>
     )
   }
+
+  const detail = detailKey && [...missions, ...pendingRequests].find(m => m.key === detailKey)
 
   return (
     <div className="flex h-screen h-dvh overflow-hidden bg-gray-50 print:h-auto print:overflow-visible">
@@ -212,6 +223,43 @@ export default function MenageDashboard({ onLogout }) {
           )}
         </div>
       </main>
+
+      {detail && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6 print:hidden" onClick={() => setDetailKey(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-navy-900 px-5 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-white text-base font-bold">{detail.boat}</h2>
+                <p className="text-navy-100 text-xs capitalize">{format(parseISO(detail.date), 'EEEE d MMMM', { locale: fr })} · {detail.heure}</p>
+              </div>
+              <button onClick={() => setDetailKey(null)} className="text-navy-100 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="p-5 flex flex-col gap-2">
+              {[['Agence', detail.agencyName], ['Client sortant', detail.client], ['Montant', `${detail.amount}€`],
+                ['Statut', detail.status === 'regle' ? paidLabel(detail) : detail.done ? doneByLabel(detail) : 'À faire']].map(([k, v]) => (
+                <div key={k} className="flex justify-between text-sm border-b border-gray-50 pb-2">
+                  <span className="text-gray-400">{k}</span><span className="font-medium text-right">{v}</span>
+                </div>
+              ))}
+              <div className="flex gap-2 mt-3">
+                <button className="btn-ghost flex-1 justify-center text-xs" onClick={() => setInvoiceMission(detail)}><Receipt size={13} /> Facture</button>
+                {detail.status !== 'regle' && (
+                  <button className={`flex-1 justify-center text-xs ${detail.done ? 'btn-ghost' : 'btn-primary'}`} onClick={() => { toggleDone(detail); setDetailKey(null) }}>
+                    <Check size={13} /> {detail.done ? 'Annuler « fait »' : 'Marquer comme fait'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-navy-900 text-white text-sm rounded-xl shadow-lg px-4 py-3 flex items-center gap-4 print:hidden">
+          <span>{toast.text}</span>
+          <button className="text-teal-200 font-medium text-xs" onClick={() => { toggleMenageDone(toast.key, { type: 'provider', name: provider.company }); setToast(null) }}>Annuler</button>
+        </div>
+      )}
 
       {invoiceMission && (
         <MenageInvoiceModal mission={invoiceMission} editable={false} onClose={() => setInvoiceMission(null)} />
