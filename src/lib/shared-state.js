@@ -298,6 +298,15 @@ export function updateMenageInvoiceLineItem(missionKey, lineId, field, value) {
   listeners.forEach(fn => fn(state))
 }
 
+// La SOCIÉTÉ DE MÉNAGE envoie sa facture à l'agence (retour pilote Midi Nautisme).
+// Statuts de la facture ménage : 'generee' (brouillon chez la société) → 'envoyee' (reçue par l'agence) → 'payee'.
+export function sendMenageInvoice(missionKey) {
+  const current = state.menageInvoices[missionKey]
+  if (!current) return
+  state = { ...state, menageInvoices: { ...state.menageInvoices, [missionKey]: { ...current, status: 'envoyee', sentAt: '2026-07-04', templateSnapshot: state.invoiceTemplates.menage } } }
+  listeners.forEach(fn => fn(state))
+}
+
 // via : 'stripe' (paiement en ligne dans Helmo → réglé automatiquement)
 //     | 'manuel' (virement, chèque… l'agence coche elle-même).
 // Pour l'instant le paiement Stripe est SIMULÉ (démo) : en production, c'est le webhook

@@ -2,7 +2,7 @@
 // déjà traité, comme dans une vraie agence en cours de saison.
 // - Location commencée : contrat signé, check-in fait.
 // - Facture client : réglée avant le départ (quelques retards récents) ; départs sous 30 jours : envoyée.
-// - Ménage passé : fait, et réglé s'il date de plus d'une semaine.
+// - Ménage passé : fait ; facture envoyée par la société (payée si > 1 semaine), sauf les tout derniers (facture attendue).
 import { BOOKINGS, MENAGE_PROVIDERS } from './mock-data'
 import { seedState } from './shared-state'
 import { getDefaultMenageForBoat } from './menage-missions'
@@ -33,7 +33,10 @@ BOOKINGS.forEach(b => {
     const provider = getDefaultMenageForBoat(b.boatId) || MENAGE_PROVIDERS[0]
     menageDone[key] = true
     menageDoneMeta[key] = { type: 'provider', name: provider.company, at: `${menageDate}T17:${b.id.length % 6}0:00` }
-    if (menageDate < addDays(TODAY, -7)) menageInvoices[key] = { data: null, status: 'payee', paidAt: addDays(b.end, 5), paidVia: 'manuel' }
+    // La société envoie sa facture après le ménage ; l'agence paie sous une semaine.
+    if (menageDate < addDays(TODAY, -7)) menageInvoices[key] = { data: null, status: 'payee', sentAt: addDays(menageDate, 1), paidAt: addDays(menageDate, 5), paidVia: 'manuel' }
+    else if (menageDate < addDays(TODAY, -1)) menageInvoices[key] = { data: null, status: 'envoyee', sentAt: addDays(menageDate, 1) }
+    // les ménages de la veille / du jour : facture encore attendue
   }
 })
 

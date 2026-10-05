@@ -3,7 +3,7 @@ import { X, ChevronRight, LogOut, Sparkles, Check, ChevronLeft, Phone, Mail, Pri
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
-import { getMissionsForProvider, getPendingRequestsForProvider, getProviderByAccessCode, groupMissionsByAgency, doneByLabel, paidLabel } from '@/lib/menage-missions'
+import { getMissionsForProvider, getPendingRequestsForProvider, getProviderByAccessCode, groupMissionsByAgency, doneByLabel, paidLabel, invoiceLabel } from '@/lib/menage-missions'
 import { getState, subscribe, toggleMenageDone, respondMenageRequest } from '@/lib/shared-state'
 import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 
@@ -48,7 +48,7 @@ function CodeLogin({ onSuccess, onBack }) {
 
 export default function MenageDashboard({ onLogout }) {
   const [providerId, setProviderId] = useState(null)
-  const [filter, setFilter] = useState('prevu') // 'prevu' | 'fait' | 'regle'
+  const [filter, setFilter] = useState('prevu') // 'prevu' | 'fait' | 'recue' | 'regle'
   const [detailKey, setDetailKey] = useState(null)
   const [toast, setToast] = useState(null)
   const [invoiceMission, setInvoiceMission] = useState(null)
@@ -64,15 +64,17 @@ export default function MenageDashboard({ onLogout }) {
   const pct = missions.length ? Math.round((done / missions.length) * 100) : 0
   const agencyGroups = groupMissionsByAgency(missions)
   const multiAgency = agencyGroups.length > 1
+  // C'est la société qui facture l'agence : ménage fait → elle envoie sa facture → l'agence la paie.
   const FILTERS = [
     { id: 'prevu', label: 'À venir' },
-    { id: 'fait', label: 'À régler' },
-    { id: 'regle', label: 'Réglés' },
+    { id: 'fait', label: 'À facturer' },
+    { id: 'recue', label: 'Envoyées' },
+    { id: 'regle', label: 'Payées' },
   ]
-  const counts = { prevu: 0, fait: 0, regle: 0 }
+  const counts = { prevu: 0, fait: 0, recue: 0, regle: 0 }
   missions.forEach(m => { counts[m.status]++ })
   const filtered = missions.filter(m => m.status === filter)
-  const owedTotal = missions.filter(m => m.status === 'fait').reduce((n, m) => n + m.amount, 0)
+  const owedTotal = missions.filter(m => m.status === 'recue').reduce((n, m) => n + m.amount, 0)
   const paidTotal = missions.filter(m => m.status === 'regle').reduce((n, m) => n + m.amount, 0)
 
   function weekGroups(items) {
@@ -87,10 +89,10 @@ export default function MenageDashboard({ onLogout }) {
 
   // Cocher « fait » range le ménage dans « À régler » : on le dit, avec un Annuler.
   function toggleDone(m) {
-    if (m.status === 'regle') return // un ménage réglé ne se décoche plus
+    if (m.status === 'regle' || m.status === 'recue') return // facture envoyée ou payée : le ménage ne se décoche plus
     const wasDone = m.done
     toggleMenageDone(m.key, { type: 'provider', name: provider.company })
-    setToast({ key: m.key, text: wasDone ? `${m.boat} : remis dans « À venir »` : `${m.boat} : fait ✓ — rangé dans « À régler »` })
+    setToast({ key: m.key, text: wasDone ? `${m.boat} : remis dans « À venir »` : `${m.boat} : fait ✓ — rangé dans « À facturer »` })
     clearTimeout(window.__menageToast)
     window.__menageToast = setTimeout(() => setToast(null), 5000)
   }
@@ -109,10 +111,15 @@ export default function MenageDashboard({ onLogout }) {
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium ${m.done ? 'text-teal-800' : 'text-gray-800'}`}>{m.boat}</p>
           <p className="text-xs text-gray-400">{m.client} · {format(parseISO(m.date), 'EEEE d MMM', { locale: fr })} · {m.heure}</p>
-          {m.done && <p className="text-[10px] text-teal-700 mt-0.5">{m.status === 'regle' ? paidLabel(m) : doneByLabel(m)}</p>}
+          {m.done && <p className="text-[10px] text-teal-700 mt-0.5">{m.status === 'fait' ? doneByLabel(m) : invoiceLabel(m)}</p>}
         </div>
         {isFriday && !m.done && (
           <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full flex-shrink-0">Vendredi soir</span>
+        )}
+        {m.status === 'fait' && (
+          <button className="text-[11px] font-medium text-white bg-navy-600 px-2.5 py-1 rounded-full flex-shrink-0 flex items-center gap-1" onClick={e => { e.stopPropagation(); setInvoiceMission(m) }}>
+            <Receipt size={11} /> Envoyer ma facture
+          </button>
         )}
         <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
       </div>
@@ -120,6 +127,7 @@ export default function MenageDashboard({ onLogout }) {
   }
 
   const detail = detailKey && [...missions, ...pendingRequests].find(m => m.key === detailKey)
+  const liveInvoice = invoiceMission && missions.find(m => m.key === invoiceMission.key)
 
   return (
     <div className="flex h-screen h-dvh overflow-hidden bg-gray-50 print:h-auto print:overflow-visible">
@@ -160,7 +168,7 @@ export default function MenageDashboard({ onLogout }) {
         <div className="topbar bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between print:hidden">
           <div>
             <h1 className="font-display text-base font-bold">Mes ménages</h1>
-            <p className="text-xs text-gray-400">{counts.prevu} à venir · <span className="text-amber-700">{owedTotal}€ à régler</span> · <span className="text-teal-700">{paidTotal}€ réglés</span></p>
+            <p className="text-xs text-gray-400">{counts.prevu} à venir{counts.fait > 0 && <> · <span className="text-navy-700 font-medium">{counts.fait} facture{counts.fait > 1 ? 's' : ''} à envoyer</span></>} · <span className="text-amber-700">{owedTotal}€ en attente de paiement</span> · <span className="text-teal-700">{paidTotal}€ payés</span></p>
           </div>
           <button className="btn-ghost text-xs" onClick={() => window.print()}><Printer size={13} /> Imprimer</button>
         </div>
@@ -179,9 +187,7 @@ export default function MenageDashboard({ onLogout }) {
                     <p className="text-sm font-bold text-navy-900 flex-shrink-0">{m.amount}€</p>
                   </div>
                   <div className="flex gap-2 mt-3">
-                    <button className="text-[11px] font-medium text-navy-600 bg-white border border-navy-100 px-2.5 py-1 rounded-full flex items-center gap-1" onClick={() => setInvoiceMission(m)}>
-                      <Receipt size={11} /> Voir la facture
-                    </button>
+                    <span className="text-[11px] text-gray-500 self-center">Tarif proposé : {m.amount}€ · tu factureras après le ménage</span>
                     <button className="btn-ghost text-xs py-1 ml-auto" onClick={() => respondMenageRequest(m.bookingId, false)}><X size={12} /> Refuser</button>
                     <button className="btn-primary text-xs py-1" onClick={() => respondMenageRequest(m.bookingId, true)}><Check size={12} /> Accepter</button>
                   </div>
@@ -203,7 +209,7 @@ export default function MenageDashboard({ onLogout }) {
         <div className="p-6 pt-4 max-w-2xl">
           {filtered.length === 0 ? (
             <div className="bg-white rounded-xl p-8 text-center border border-gray-100">
-              <p className="text-sm text-gray-400">{filter === 'prevu' ? 'Aucun ménage à venir.' : filter === 'fait' ? 'Rien en attente de paiement.' : 'Aucun ménage réglé pour le moment.'}</p>
+              <p className="text-sm text-gray-400">{filter === 'prevu' ? 'Aucun ménage à venir.' : filter === 'fait' ? 'Aucune facture à envoyer.' : filter === 'recue' ? "Aucune facture en attente de paiement." : 'Aucun ménage payé pour le moment.'}</p>
             </div>
           ) : (
             <div className="flex flex-col gap-5">
@@ -237,14 +243,14 @@ export default function MenageDashboard({ onLogout }) {
             </div>
             <div className="p-5 flex flex-col gap-2">
               {[['Agence', detail.agencyName], ['Client sortant', detail.client], ['Montant', `${detail.amount}€`],
-                ['Statut', detail.status === 'regle' ? paidLabel(detail) : detail.done ? doneByLabel(detail) : 'À faire']].map(([k, v]) => (
+                ['Statut', !detail.done ? 'À faire' : detail.status === 'fait' ? 'Fait · facture à envoyer' : invoiceLabel(detail)]].map(([k, v]) => (
                 <div key={k} className="flex justify-between text-sm border-b border-gray-50 pb-2">
                   <span className="text-gray-400">{k}</span><span className="font-medium text-right">{v}</span>
                 </div>
               ))}
               <div className="flex gap-2 mt-3">
-                <button className="btn-ghost flex-1 justify-center text-xs" onClick={() => setInvoiceMission(detail)}><Receipt size={13} /> Facture</button>
-                {detail.status !== 'regle' && (
+                <button className="btn-ghost flex-1 justify-center text-xs" onClick={() => setInvoiceMission(detail)}><Receipt size={13} /> {detail.status === 'fait' ? 'Envoyer ma facture' : 'Ma facture'}</button>
+                {!['regle', 'recue'].includes(detail.status) && (
                   <button className={`flex-1 justify-center text-xs ${detail.done ? 'btn-ghost' : 'btn-primary'}`} onClick={() => { toggleDone(detail); setDetailKey(null) }}>
                     <Check size={13} /> {detail.done ? 'Annuler « fait »' : 'Marquer comme fait'}
                   </button>
@@ -263,7 +269,7 @@ export default function MenageDashboard({ onLogout }) {
       )}
 
       {invoiceMission && (
-        <MenageInvoiceModal mission={invoiceMission} editable={false} onClose={() => setInvoiceMission(null)} />
+        <MenageInvoiceModal mission={liveInvoice || invoiceMission} side="provider" onClose={() => setInvoiceMission(null)} />
       )}
     </div>
   )

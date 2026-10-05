@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Sparkles, Phone, Mail, Check, ChevronRight, X, Copy, Receipt, CreditCard } from 'lucide-react'
+import { Sparkles, Phone, Mail, Check, ChevronRight, X, Copy, Receipt } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { MENAGE_PROVIDERS } from '@/lib/mock-data'
-import { getMissionsForProvider, getUnconfirmedMenages, doneByLabel, paidLabel } from '@/lib/menage-missions'
+import { getMissionsForProvider, getUnconfirmedMenages, doneByLabel, paidLabel, invoiceLabel } from '@/lib/menage-missions'
 import { buildMenageInvoiceData } from '@/lib/menage-invoice'
 import { getState, subscribe, toggleMenageDone, getMenageInvoice, markMenageInvoicePaid, sendMenageRequest, respondMenageRequest } from '@/lib/shared-state'
 import { Card } from '@/components/ui'
@@ -13,21 +13,22 @@ import MenageInvoiceModal from '@/components/planning/MenageInvoiceModal'
 const fmtDay = d => format(parseISO(d), 'EEE d MMM', { locale: fr })
 
 function StatusPill({ m }) {
-  if (m.status === 'regle') return <span className="pill-ok text-[10px] flex-shrink-0">Réglé</span>
-  if (m.status === 'fait') return <span className="pill-warn text-[10px] flex-shrink-0">À régler</span>
+  if (m.status === 'regle') return <span className="pill-ok text-[10px] flex-shrink-0">Payée</span>
+  if (m.status === 'recue') return <span className="pill-warn text-[10px] flex-shrink-0">Facture reçue</span>
+  if (m.status === 'fait') return <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">Facture attendue</span>
   return null
 }
 
-// Règlement : en ligne (Stripe → réglé automatiquement) ou à la main (virement, chèque…).
-function pay(m, via) {
-  getMenageInvoice(m.key, buildMenageInvoiceData(m)) // crée la facture si elle n'a jamais été ouverte
-  markMenageInvoicePaid(m.key, via)
+// L'agence ne règle qu'une facture REÇUE de la société (virement, chèque… marqué à la main).
+function pay(m) {
+  getMenageInvoice(m.key, buildMenageInvoiceData(m))
+  markMenageInvoicePaid(m.key, 'manuel')
 }
 
 // ── Liste des factures ménage : à régler / réglées ─────────────────
 function PaymentsModal({ missions, onClose, onOpenInvoice }) {
-  const [tab, setTab] = useState('a_regler')
-  const list = missions.filter(m => (tab === 'a_regler' ? m.status === 'fait' : m.status === 'regle'))
+  const [tab, setTab] = useState('recue')
+  const list = missions.filter(m => m.status === tab)
   const total = list.reduce((n, m) => n + m.amount, 0)
 
   return (
@@ -41,14 +42,14 @@ function PaymentsModal({ missions, onClose, onOpenInvoice }) {
           <button onClick={onClose} className="text-navy-100 hover:text-white"><X size={18} /></button>
         </div>
         <div className="px-5 pt-4 flex gap-1.5 flex-shrink-0">
-          {[{ id: 'a_regler', label: 'À régler' }, { id: 'reglees', label: 'Réglées' }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${tab === t.id ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t.label}</button>
+          {[{ id: 'recue', label: 'Reçues · à payer' }, { id: 'fait', label: 'Attendues' }, { id: 'regle', label: 'Payées' }].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${tab === t.id ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t.label} ({missions.filter(m => m.status === t.id).length})</button>
           ))}
         </div>
         <div className="flex-1 overflow-auto p-5 flex flex-col gap-2">
           {list.length === 0 && (
             <div className="bg-gray-50 rounded-xl p-6 text-center">
-              <p className="text-sm text-gray-400">{tab === 'a_regler' ? 'Rien à régler : aucun ménage fait en attente de paiement.' : 'Aucune facture réglée pour le moment.'}</p>
+              <p className="text-sm text-gray-400">{tab === 'recue' ? 'Aucune facture reçue en attente de paiement.' : tab === 'fait' ? "Aucune facture attendue : les sociétés ont envoyé toutes celles des ménages faits." : 'Aucune facture payée pour le moment.'}</p>
             </div>
           )}
           {list.map(m => (
@@ -57,17 +58,14 @@ function PaymentsModal({ missions, onClose, onOpenInvoice }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{m.boat}</p>
                   <p className="text-xs text-gray-400">{m.providerName} · {fmtDay(m.date)} · {m.client}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{m.status === 'regle' ? paidLabel(m) : doneByLabel(m)}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{m.status === 'fait' ? `${doneByLabel(m)} · facture pas encore envoyée par la société` : invoiceLabel(m)}</p>
                 </div>
                 <p className="text-sm font-bold text-navy-900 flex-shrink-0">{m.amount}€</p>
               </div>
               <div className="flex gap-2 mt-2.5">
-                <button className="btn-ghost text-xs py-1" onClick={() => onOpenInvoice(m)}><Receipt size={12} /> Facture</button>
-                {m.status === 'fait' && (
-                  <>
-                    <button className="btn-ghost text-xs py-1 ml-auto" onClick={() => pay(m, 'manuel')}><Check size={12} /> Marquer réglé</button>
-                    <button className="btn-primary text-xs py-1" onClick={() => pay(m, 'stripe')} title="Démo : simule un paiement Stripe"><CreditCard size={12} /> Payer en ligne</button>
-                  </>
+                {m.status !== 'fait' && <button className="btn-ghost text-xs py-1" onClick={() => onOpenInvoice(m)}><Receipt size={12} /> Voir la facture</button>}
+                {m.status === 'recue' && (
+                  <button className="btn-primary text-xs py-1 ml-auto" onClick={() => pay(m)}><Check size={12} /> Marquer payée</button>
                 )}
               </div>
             </div>
@@ -116,7 +114,7 @@ function ProviderDetail({ provider, missions, onClose, onOpenInvoice }) {
           </div>
         </div>
         <div className="px-5 pt-3 flex-shrink-0">
-          <p className="text-[11px] text-gray-400">La société coche elle-même depuis son accès. Tu peux cocher à sa place si elle a oublié : ce sera indiqué « marqué fait par l'agence ».</p>
+          <p className="text-[11px] text-gray-400">La société coche et envoie sa facture depuis son accès. Tu peux cocher « fait » à sa place si elle a oublié : ce sera indiqué « marqué fait par l'agence ».</p>
         </div>
         <div className="flex-1 overflow-auto p-4">
           {missions.length === 0 ? (
@@ -142,12 +140,14 @@ function ProviderDetail({ provider, missions, onClose, onOpenInvoice }) {
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-medium ${m.done ? 'text-teal-800' : 'text-gray-800'}`}>{m.boat}</p>
                           <p className="text-xs text-gray-400">{m.client} · {fmtDay(m.date)} · {m.heure}</p>
-                          {m.done && <p className="text-[10px] text-teal-700 mt-0.5">{m.status === 'regle' ? paidLabel(m) : doneByLabel(m)}</p>}
+                          {m.done && <p className="text-[10px] text-teal-700 mt-0.5">{m.status === 'fait' ? doneByLabel(m) : invoiceLabel(m)}</p>}
                         </div>
                         <StatusPill m={m} />
-                        <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1" onClick={() => onOpenInvoice(m)}>
-                          <Receipt size={10} /> Facture
-                        </button>
+                        {(m.status === 'recue' || m.status === 'regle') && (
+                          <button className="text-[10px] font-medium text-navy-600 bg-navy-50 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1" onClick={() => onOpenInvoice(m)}>
+                            <Receipt size={10} /> Facture
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -177,7 +177,8 @@ export default function Menage() {
   const selectedProvider = providers.find(p => p.id === selected)
   const allMissions = providers.flatMap(p => p.missions)
   const upcoming = allMissions.filter(m => m.status === 'prevu')
-  const toPay = allMissions.filter(m => m.status === 'fait')
+  const toPay = allMissions.filter(m => m.status === 'recue')
+  const awaited = allMissions.filter(m => m.status === 'fait')
   const toPayAmount = toPay.reduce((n, m) => n + m.amount, 0)
   // Garde la facture ouverte à jour (montant, statut) quand l'état change.
   const unconfirmed = getUnconfirmedMenages(activeBrand)
@@ -197,8 +198,9 @@ export default function Menage() {
           <span className="text-gray-500"><strong className="text-navy-900">{upcoming.length}</strong> à venir</span>
           <span className="text-gray-300">·</span>
           <span className="text-gray-500"><strong className="text-teal-600">{allMissions.length - upcoming.length}</strong> faits</span>
+          {awaited.length > 0 && <><span className="text-gray-300">·</span><span className="text-gray-500"><strong className="text-gray-700">{awaited.length}</strong> facture{awaited.length > 1 ? 's' : ''} attendue{awaited.length > 1 ? 's' : ''}</span></>}
           <button className="ml-auto flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-100 hover:bg-amber-100" onClick={() => setShowPayments(true)}>
-            <Receipt size={12} /> {toPayAmount}€ à régler · {toPay.length} facture{toPay.length > 1 ? 's' : ''} →
+            <Receipt size={12} /> {toPayAmount}€ reçus à payer · {toPay.length} facture{toPay.length > 1 ? 's' : ''} →
           </button>
         </div>
 
@@ -211,7 +213,7 @@ export default function Menage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{m.boat} <span className="text-xs font-normal text-gray-500">· {fmtDay(m.date)} · {m.client}</span></p>
                     <p className={`text-[11px] ${m.requestStatus === 'refusee' ? 'text-danger-700' : 'text-amber-700'}`}>
-                      {m.requestStatus === 'refusee' ? `${m.providerName} a refusé — choisis une autre société` : `Demande et facture (${m.amount}€) envoyées à ${m.providerName} · en attente de sa réponse`}
+                      {m.requestStatus === 'refusee' ? `${m.providerName} a refusé — choisis une autre société` : `Demande envoyée à ${m.providerName} (tarif ${m.amount}€) · en attente de sa réponse`}
                     </p>
                   </div>
                   {m.requestStatus === 'refusee' ? (
@@ -235,7 +237,7 @@ export default function Menage() {
         <Card className="divide-y divide-gray-50">
           {providers.map(p => {
             const done = p.missions.filter(m => m.done).length
-            const owed = p.missions.filter(m => m.status === 'fait').reduce((n, m) => n + m.amount, 0)
+            const owed = p.missions.filter(m => m.status === 'recue').reduce((n, m) => n + m.amount, 0)
             const pct = p.missions.length ? Math.round((done / p.missions.length) * 100) : 0
             return (
               <div key={p.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-gray-50 -mx-4 px-4 transition-colors" onClick={() => setSelected(p.id)}>
@@ -247,7 +249,7 @@ export default function Menage() {
                     <p className="text-sm font-medium">{p.company}</p>
                     <span className="pill-blue text-[9px]">Sous-traitant</span>
                   </div>
-                  <p className="text-xs text-gray-400">{p.contact} · {done}/{p.missions.length} faits{owed > 0 ? ` · ${owed}€ à régler` : ''}</p>
+                  <p className="text-xs text-gray-400">{p.contact} · {done}/{p.missions.length} faits{owed > 0 ? ` · ${owed}€ à payer` : ''}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className={`text-sm font-medium ${pct === 100 ? 'text-teal-600' : 'text-gray-500'}`}>{pct}%</p>
@@ -266,7 +268,7 @@ export default function Menage() {
         <ProviderDetail provider={selectedProvider} missions={selectedProvider.missions} onClose={() => setSelected(null)} onOpenInvoice={setInvoiceMission} />
       )}
       {showPayments && <PaymentsModal missions={allMissions} onClose={() => setShowPayments(false)} onOpenInvoice={setInvoiceMission} />}
-      {liveInvoiceMission && <MenageInvoiceModal mission={liveInvoiceMission} editable onClose={() => setInvoiceMission(null)} />}
+      {liveInvoiceMission && <MenageInvoiceModal mission={liveInvoiceMission} side="agency" onClose={() => setInvoiceMission(null)} />}
     </div>
   )
 }

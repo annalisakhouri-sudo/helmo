@@ -521,7 +521,8 @@ export function FacturationTab() {
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        {INVOICE_TYPES.map(t => (
+        {/* Le loueur ne gère que SES factures : la facture ménage est émise par la société de ménage. */}
+        {INVOICE_TYPES.filter(t => t.id !== 'menage').map(t => (
           <button
             key={t.id}
             onClick={() => setType(t.id)}

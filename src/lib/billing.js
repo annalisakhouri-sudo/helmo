@@ -1,6 +1,6 @@
 // Pôle facturation : TOUTES les factures de l'agence au même endroit, avec un seul circuit.
 // - Clients (ce qu'on encaisse) : prevue → envoyee → reglee
-// - Prestataires (ce qu'on paie : ménage, skippers) : a_venir → a_payer → reglee
+// - Prestataires (ce qu'on paie : ménage, skippers) : a_venir → (attendue : facture pas encore reçue) → a_payer → reglee
 import { BOOKINGS, SKIPPERS } from './mock-data'
 import { getState } from './shared-state'
 import { buildInvoiceData } from './invoice'
@@ -35,7 +35,8 @@ export function getProviderBills(brand) {
     .map(m => ({
       key: 'men-' + m.key, kind: 'menage', mission: m,
       who: m.providerName, what: `Ménage · ${m.boat}`, date: m.date, due: addDays(m.date, 30), amount: m.amount,
-      status: m.status === 'regle' ? 'reglee' : m.status === 'fait' ? 'a_payer' : 'a_venir',
+      // La société envoie sa facture : on ne paie qu'une facture reçue.
+      status: m.status === 'regle' ? 'reglee' : m.status === 'recue' ? 'a_payer' : m.status === 'fait' ? 'attendue' : 'a_venir',
       paidAt: m.paidAt,
     }))
 

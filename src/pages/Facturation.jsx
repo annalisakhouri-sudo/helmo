@@ -16,11 +16,12 @@ const STATUS = {
   prevue: { label: 'Prévue', cls: 'bg-gray-100 text-gray-500' },
   envoyee: { label: 'Envoyée', cls: 'bg-amber-50 text-amber-700' },
   a_venir: { label: 'À venir', cls: 'bg-gray-100 text-gray-500' },
-  a_payer: { label: 'À payer', cls: 'bg-navy-50 text-navy-700' },
+  attendue: { label: 'Facture attendue', cls: 'bg-gray-100 text-gray-600' },
+  a_payer: { label: 'Reçue · à payer', cls: 'bg-navy-50 text-navy-700' },
   reglee: { label: 'Réglée', cls: 'bg-teal-50 text-teal-700' },
 }
 const CLIENT_FILTERS = [['tous', 'Toutes'], ['envoyee', 'À encaisser'], ['prevue', 'Prévues'], ['reglee', 'Réglées']]
-const PROVIDER_FILTERS = [['tous', 'Toutes'], ['a_payer', 'À payer'], ['a_venir', 'À venir'], ['reglee', 'Réglées']]
+const PROVIDER_FILTERS = [['tous', 'Toutes'], ['a_payer', 'Reçues · à payer'], ['attendue', 'Attendues'], ['a_venir', 'À venir'], ['reglee', 'Payées']]
 const KIND_ICON = { client: User, menage: Sparkles, skipper: Anchor }
 
 export default function Facturation() {
@@ -170,7 +171,7 @@ export default function Facturation() {
             const st = STATUS[r.status]
             return (
               <div key={r.key} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer"
-                onClick={() => r.kind === 'client' ? setOpenClient(r.booking) : r.kind === 'menage' ? setOpenMenage(r.mission) : null}>
+                onClick={() => r.kind === 'client' ? setOpenClient(r.booking) : (r.kind === 'menage' && ['a_payer', 'reglee'].includes(r.status)) ? setOpenMenage(r.mission) : null}>
                 <Icon size={14} className="text-gray-400 flex-shrink-0" />
                 <div className="w-16 text-xs text-gray-500 flex-shrink-0">{fmtDate(r.date)}</div>
                 <div className="flex-1 min-w-0">
@@ -197,7 +198,7 @@ export default function Facturation() {
       </div>
 
       {openClient && <InvoiceModal booking={openClient} onClose={() => setOpenClient(null)} />}
-      {openMenage && <MenageInvoiceModal mission={openMenage} editable onClose={() => setOpenMenage(null)} />}
+      {openMenage && <MenageInvoiceModal mission={openMenage} side="agency" onClose={() => setOpenMenage(null)} />}
     </div>
   )
 }

@@ -74,8 +74,10 @@ export function buildAllMenageMissions() {
       statut: computeStatut(date),
       done: isDone,
       doneMeta: doneMeta[key] || null,
-      // Circuit unique : prevu → fait → regle. « À régler » = fait mais pas encore réglé.
-      status: isPaid ? 'regle' : isDone ? 'fait' : 'prevu',
+      // Circuit : prevu → fait (facture attendue) → recue (la société a envoyé sa facture) → regle.
+      // C'est la société qui facture l'agence ; l'agence suit seulement reçue → payée.
+      status: isPaid ? 'regle' : invoice?.status === 'envoyee' ? 'recue' : isDone ? 'fait' : 'prevu',
+      invoiceSentAt: invoice?.sentAt || null,
       paidAt: isPaid ? invoice.paidAt : null,
       paidVia: isPaid ? (invoice.paidVia || 'manuel') : null,
       amount,
@@ -144,6 +146,13 @@ export function doneByLabel(m) {
   const t = new Date(meta.at)
   const hour = `${t.getHours()}h${String(t.getMinutes()).padStart(2, '0')}`
   return meta.type === 'agency' ? `Marqué fait par l'agence à ${hour}` : `Coché par ${meta.name} à ${hour}`
+}
+
+export function invoiceLabel(m) {
+  if (m.status === 'regle') return paidLabel(m)
+  if (m.status === 'recue') return `Facture reçue le ${new Date(m.invoiceSentAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
+  if (m.status === 'fait') return 'Facture attendue'
+  return null
 }
 
 export function paidLabel(m) {

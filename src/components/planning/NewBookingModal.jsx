@@ -523,7 +523,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
                       <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" value={form.menageProviderId} onChange={e => set('menageProviderId', e.target.value)}>
                         {MENAGE_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.company}{getDefaultMenageForBoat(form.boatId)?.id === p.id ? ' (habituelle)' : ''}</option>)}
                       </select>
-                      <p className="text-[10px] text-gray-400 mt-1">Demande + facture de {opt.price}€ envoyées à la société, à confirmer de son côté.</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Demande envoyée à la société (tarif {opt.price}€). Elle accepte, puis t'envoie sa facture une fois le ménage fait.</p>
                     </div>
                   )}
 
@@ -664,7 +664,7 @@ export default function NewBookingModal({ onClose, onAdd, activeBrand }) {
               {form.options.menage && (
                 <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 rounded-lg p-3 text-xs text-navy-700 mb-3">
                   <Check size={13} className="flex-shrink-0 text-navy-600" />
-                  Ménage : demande et facture envoyées à {MENAGE_PROVIDERS.find(p => p.id === form.menageProviderId)?.company}. Il entre dans son planning dès qu'elle accepte.
+                  Ménage : demande envoyée à {MENAGE_PROVIDERS.find(p => p.id === form.menageProviderId)?.company}. Il entre dans son planning dès qu'elle accepte ; elle t'enverra sa facture après le ménage.
                 </div>
               )}
               {form.options.skipper && form.skipperId && (
