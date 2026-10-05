@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
-import { X, ArrowUpRight, ArrowDownLeft, AlertTriangle, Euro } from 'lucide-react'
-import { getMaintenanceTasks, subscribe } from '@/lib/shared-state'
-import { OPTIONS_CATALOG } from '@/lib/mock-data'
+import { X, ArrowUpRight, ArrowDownLeft, AlertTriangle, Euro, Sparkles, Wrench, ChevronDown } from 'lucide-react'
+import { getMaintenanceTasks, subscribe, getState } from '@/lib/shared-state'
+import { OPTIONS_CATALOG, TECHNICIANS } from '@/lib/mock-data'
+import { buildAllMenageMissions, doneByLabel, paidLabel } from '@/lib/menage-missions'
+import { buildAllMissions, getMissionTasks } from '@/lib/tech-missions'
+import { fmtDate } from '@/lib/dates'
 
 // Cette fiche est celle de l'EXTRANET AGENCE : lecture seule, juste une vision globale
 // de l'avancement du technicien. Le détail éditable (checklist, notes, prix des écarts)
@@ -68,9 +71,12 @@ export function buildChecklist(boat, booking) {
   return sections
 }
 
-function ProgressCard({ icon: Icon, iconBg, title, subtitle, pct, complete }) {
+function ProgressCard({ icon: Icon, iconBg, title, subtitle, pct, complete, details }) {
+  const [open, setOpen] = useState(false)
+  // Une fois à 100 %, le détail devient consultable d'un clic.
+  const canOpen = complete && details && details.length > 0
   return (
-    <div className="card mb-3">
+    <div className={`card mb-3 ${canOpen ? 'cursor-pointer hover:border-teal-200' : ''}`} onClick={() => canOpen && setOpen(o => !o)}>
       <div className="flex items-center gap-3 mb-2">
         <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
           <Icon size={16} className="text-white" />
@@ -87,6 +93,19 @@ function ProgressCard({ icon: Icon, iconBg, title, subtitle, pct, complete }) {
       <div className="bg-gray-100 rounded-full h-2">
         <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: complete ? '#1D9E75' : '#EF9F27' }} />
       </div>
+      {canOpen && (
+        <p className="text-[11px] text-teal-700 mt-2 flex items-center gap-1">{open ? 'Masquer' : 'Consulter'} le détail <ChevronDown size={11} className={open ? 'rotate-180' : ''} /></p>
+      )}
+      {open && (
+        <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-1">
+          {details.map((d, i) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="text-gray-600">{d.label}</span>
+              <span className="text-teal-700 font-medium">{d.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -127,6 +146,21 @@ export default function MaintenanceModal({ booking, nextBooking, boat, onClose }
 
   const totalCost = missingItems.reduce((sum, i) => sum + (Number(anomalyDetails[i.id]?.price) || 0), 0)
 
+  // Ménage rattaché à ce créneau (celui de la location qui se termine).
+  const menage = buildAllMenageMissions().find(m => m.bookingId === booking.id)
+  // Jauges techniciens : retour du client actuel + préparation du suivant.
+  const allMissions = buildAllMissions()
+  const techGauge = key => {
+    const m = allMissions.find(x => x.key === key)
+    if (!m) return null
+    const tech = TECHNICIANS.find(t => t.id === m.techId)
+    const tasks = tech ? getMissionTasks(tech, m) : []
+    const done = tasks.filter(t => t.done).length
+    return { m, tech, tasks, done, pct: tasks.length ? Math.round((done / tasks.length) * 100) : 0 }
+  }
+  const gauges = [techGauge(`ret-${booking.id}`), nextBooking && techGauge(`dep-${nextBooking.id}`)].filter(Boolean)
+  const clientCheckIn = nextBooking ? getState().checkIns[nextBooking.id] : null
+
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-6" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -140,17 +174,53 @@ export default function MaintenanceModal({ booking, nextBooking, boat, onClose }
 
         <div className="flex-1 overflow-auto p-5">
           <p className="text-xs text-gray-400 mb-4">
-            Préparation entre <strong>{booking.client}</strong> ({booking.end}) et {nextBooking ? <strong>{nextBooking.client}</strong> : 'le prochain client'}.
-            {' '}Détail rempli par le technicien sur son app — vue d'ensemble ici.
+            Préparation entre <strong>{booking.client}</strong> ({fmtDate(booking.end)}) et {nextBooking ? <strong>{nextBooking.client}</strong> : 'le prochain client'}.
+
           </p>
 
+          <p className="section-label">Ménage</p>
+          {menage ? (
+            <div className={`card-sm mb-4 flex items-center gap-3 ${menage.done ? 'bg-teal-50 border border-teal-100' : ''}`}>
+              <Sparkles size={15} className={menage.done ? 'text-teal-600' : 'text-gray-400'} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{menage.providerName}</p>
+                <p className="text-[11px] text-gray-500">
+                  {menage.requestStatus === 'a_confirmer' ? 'Demande envoyée · en attente de confirmation'
+                    : menage.requestStatus === 'refusee' ? 'Refusé · choisir une autre société (page Ménage)'
+                    : menage.status === 'regle' ? paidLabel(menage)
+                    : menage.done ? doneByLabel(menage)
+                    : `Prévu ${fmtDate(menage.date)} à ${menage.heure}`}
+                </p>
+              </div>
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${menage.done ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}>{menage.done ? 'Fait' : menage.requestStatus === 'acceptee' ? 'Prévu' : 'À confirmer'}</span>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 mb-4">Pas d'option ménage : le nettoyage est fait par le technicien.</p>
+          )}
+
+          <p className="section-label">Technicien</p>
+          {gauges.map(g => (
+            <ProgressCard
+              key={g.m.key}
+              icon={Wrench}
+              iconBg={g.m.type === 'retour' ? '#0F7D57' : '#1B4F8A'}
+              title={`${g.m.type === 'retour' ? 'Retour' : 'Départ'} — ${g.tech?.name || 'à réassigner'}`}
+              subtitle={`${fmtDate(g.m.date)} · ${g.done}/${g.tasks.length} tâches`}
+              pct={g.pct}
+              complete={g.tasks.length > 0 && g.done === g.tasks.length}
+              details={g.tasks.map(t => ({ label: t.label, value: t.done ? '✓' : '—' }))}
+            />
+          ))}
+
+          <p className="section-label mt-2">Inventaire</p>
           <ProgressCard
             icon={ArrowUpRight}
             iconBg="#0F7D57"
-            title={`Arrivée — ${booking.client}`}
-            subtitle="Check-out vs check-in de départ"
+            title={`Check-out — ${booking.client}`}
+            subtitle="Retour comparé au check-in de départ"
             pct={arrivalPct}
             complete={arrivalComplete}
+            details={ARRIVAL_ITEMS.map(i => ({ label: i.label, value: `${arrivalQuantities[i.id] ?? i.max}/${departureQuantities[i.id] ?? i.max}` }))}
           />
 
           {missingItems.length > 0 && (
@@ -189,10 +259,14 @@ export default function MaintenanceModal({ booking, nextBooking, boat, onClose }
             <ProgressCard
               icon={ArrowDownLeft}
               iconBg="#1B4F8A"
-              title={`Départ — ${nextBooking.client}`}
-              subtitle={`Check-in à remplir · ${departureDone}/${DEPARTURE_ITEMS.length}`}
-              pct={departurePct}
-              complete={departureComplete}
+              title={`Check-in — ${nextBooking.client}`}
+              subtitle={clientCheckIn?.done ? 'Check-in client signé' : `À remplir · ${departureDone}/${DEPARTURE_ITEMS.length}`}
+              pct={clientCheckIn?.done ? 100 : departurePct}
+              complete={clientCheckIn?.done || departureComplete}
+              details={[
+                ...DEPARTURE_ITEMS.map(i => ({ label: i.label, value: `${clientCheckIn?.done ? i.max : (newCheckinQuantities[i.id] ?? 0)}/${i.max}` })),
+                ...(clientCheckIn?.remarks ? [{ label: 'Remarques', value: clientCheckIn.remarks }] : []),
+              ]}
             />
           )}
           {!nextBooking && (

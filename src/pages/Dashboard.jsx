@@ -10,6 +10,7 @@ import MaintenanceModal from '@/components/planning/MaintenanceModal'
 import { getState, subscribe } from '@/lib/shared-state'
 import { getRequest } from '@/lib/skipper-requests'
 import { getUnconfirmedMenages } from '@/lib/menage-missions'
+import { getUnassignedMissions } from '@/lib/tech-missions'
 import { SKIPPERS } from '@/lib/mock-data'
 import { fmtDate, fmtRange } from '@/lib/dates'
 
@@ -201,6 +202,8 @@ export default function Dashboard() {
     .map(b => ({ ...b, issues: getBookingIssues(b, null) }))
   const incomplete = [...thisWeek, ...upcomingSkipper]
   const refusedMenages = getUnconfirmedMenages(activeBrand).filter(m => m.requestStatus === 'refusee')
+  const brandBoatIds = boats.map(b => b.id)
+  const unassignedTech = getUnassignedMissions().filter(m => brandBoatIds.includes(m.boatId))
 
   // ── Rotation du week-end (samedi de la semaine en cours) ──
   const saturdayInPeriod = currentWeekStart
@@ -265,7 +268,7 @@ export default function Dashboard() {
               <AlertTriangle size={18} style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57' }} />
             </div>
             <div>
-              <p className="font-display text-2xl font-bold" style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57', lineHeight: 1.1 }}>{incomplete.length + refusedMenages.length}</p>
+              <p className="font-display text-2xl font-bold" style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57', lineHeight: 1.1 }}>{incomplete.length + refusedMenages.length + (unassignedTech.length ? 1 : 0)}</p>
               <p className="text-xs text-gray-400 mt-0.5">À traiter</p>
             </div>
           </div>
@@ -275,10 +278,20 @@ export default function Dashboard() {
         <WeekendRotation saturday={saturdayInPeriod} returningBookings={returningBookings} onSelect={handleRotationSelect} />
 
         {/* Alertes uniquement — ce qui bloque vraiment */}
-        {(incomplete.length > 0 || refusedMenages.length > 0) && (
+        {(incomplete.length > 0 || refusedMenages.length > 0 || unassignedTech.length > 0) && (
           <div className="mb-6">
             <p className="section-label">À traiter</p>
             <div className="flex flex-col gap-2">
+              {unassignedTech.length > 0 && (
+                <div className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/techniciens')}>
+                  <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate text-amber-800">{unassignedTech.length} mission{unassignedTech.length > 1 ? 's' : ''} technicien sans responsable</p>
+                    <p className="text-xs text-amber-700">Technicien en congé · à partir du {fmtDate(unassignedTech[0].date)} · à confier à un autre</p>
+                  </div>
+                  <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Voir →</span>
+                </div>
+              )}
               {refusedMenages.map(m => (
                 <div key={m.key} className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/menage')}>
                   <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
@@ -364,7 +377,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">{b.boatName}</p>
-                      <p className="text-xs text-gray-400">{b.client} · {listModal === 'departs' ? `Départ ${b.start}` : `Retour ${b.end}`}</p>
+                      <p className="text-xs text-gray-400">{b.client} · {listModal === 'departs' ? `Départ ${fmtDate(b.start)}` : `Retour ${fmtDate(b.end)}`}</p>
                     </div>
                     <ChevronRight size={14} className="text-gray-300" />
                   </div>

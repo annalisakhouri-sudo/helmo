@@ -1,6 +1,6 @@
 import { parseISO, addDays, format } from 'date-fns'
 import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from './mock-data'
-import { getState, getTechTasks } from './shared-state'
+import { getState, getTechTasks, isTechOff } from './shared-state'
 import { getMenageForTechMission } from './menage-missions'
 
 export const TODAY_STR = '2026-07-04'
@@ -82,7 +82,8 @@ export function buildAllMissions() {
 
     // ── Départ ──
     const departKey = `dep-${b.id}`
-    const departTechId = assignments[departKey] || defaultTech.id
+    // Responsable du bateau en congé ce jour-là (et pas de réassignation) → mission à réassigner.
+    const departTechId = assignments[departKey] || (isTechOff(defaultTech.id, b.start) ? null : defaultTech.id)
     missions.push({
       id: departKey,
       key: departKey,
@@ -105,9 +106,9 @@ export function buildAllMissions() {
 
     // ── Retour ──
     const retourKey = `ret-${b.id}`
-    const retourTechId = assignments[retourKey] || defaultTech.id
     const hasLastNight = b.lastNightAboard !== false
     const retourDate = isDayTrip || hasLastNight ? b.end : format(addDays(parseISO(b.end), -1), 'yyyy-MM-dd')
+    const retourTechId = assignments[retourKey] || (isTechOff(defaultTech.id, retourDate) ? null : defaultTech.id)
     missions.push({
       id: retourKey,
       key: retourKey,
@@ -145,6 +146,21 @@ export function getMissionsForTech(techId) {
   return buildAllMissions().filter(m => m.techId === techId)
 }
 
+// Missions sans technicien (le responsable est en congé) : à réassigner par l'agence.
+export function getUnassignedMissions() {
+  return buildAllMissions().filter(m => !m.techId && m.date >= '2026-07-04')
+}
+
+// Techniciens proposables pour une mission : tous sauf ceux en congé ce jour-là.
+// Ceux d'une autre base restent proposés (l'équipe s'adapte), avec la mention « autre base ».
+export function getTechOptions(mission) {
+  const defaultTech = TECHNICIANS.find(t => t.id === mission.defaultTechId)
+  return TECHNICIANS
+    .filter(t => !isTechOff(t.id, mission.date))
+    .map(t => ({ ...t, otherBase: defaultTech && t.base !== defaultTech.base }))
+    .sort((a, b) => Number(a.otherBase) - Number(b.otherBase))
+}
+
 // Tâches « nettoyage » retirées de la check-list quand une société de ménage s'en charge.
 const CLEANING_TASK = /^nettoyage/i
 
@@ -156,7 +172,7 @@ export function getMissionTasks(tech, mission) {
   const source = seedTasks && seedTasks.length ? seedTasks : mission.defaultTasks
   const defaults = source
     .filter(t => !(mission.menage && CLEANING_TASK.test(t.label)))
-    .map((t, i) => ({ id: `${mission.key}-${i}`, label: t.label, done: t.done ?? false }))
+    .map((t, i) => ({ id: `${mission.key}-${i}`, label: t.label, done: mission.date < '2026-07-04' ? true : (t.done ?? false) }))
   return getTechTasks(tech.id, mission.key, defaults)
 }
 

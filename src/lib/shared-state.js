@@ -12,6 +12,11 @@ let state = {
   // du bateau (voir mock-data TECHNICIANS.assignedBoats) ; l'agence peut réassigner
   // une mission précise à un autre technicien, ce qui prime sur ce défaut.
   missionAssignments: {},
+  // techDaysOff : techId -> [{ id, start, end, label }] (dates incluses). Un technicien en congé
+  // n'est pas proposé pour une mission ces jours-là, et ses missions passent « à réassigner ».
+  techDaysOff: {
+    'tech-3': [{ id: 'off-1', start: '2026-07-18', end: '2026-07-24', label: 'Congés' }],
+  },
   // missionRequests : demandes d'un technicien (empêchement, échange...) à traiter par l'agence.
   missionRequests: [],
   // Notes libres du technicien sur une mission (départ ou retour), accessibles depuis
@@ -186,6 +191,9 @@ export function setMissionNote(bookingId, text) {
 export function getContract(bookingId, defaultTemplateId, defaultContent) {
   if (!state.contracts[bookingId]) {
     state.contracts[bookingId] = { templateId: defaultTemplateId, content: defaultContent, status: 'brouillon', sentAt: null }
+  } else if (state.contracts[bookingId].content == null) {
+    // Contrat de l'historique (déjà signé) : le texte est généré à la première ouverture.
+    state.contracts[bookingId] = { ...state.contracts[bookingId], templateId: defaultTemplateId, content: defaultContent }
   }
   return state.contracts[bookingId]
 }
@@ -236,6 +244,8 @@ export function resetInvoiceTemplate(type) {
 export function getInvoice(bookingId, defaultData) {
   if (!state.invoices[bookingId]) {
     state.invoices[bookingId] = { data: { ...defaultData, notes: '' }, status: 'brouillon', sentAt: null, paidAt: null }
+  } else if (!state.invoices[bookingId].data) {
+    state.invoices[bookingId] = { ...state.invoices[bookingId], data: { ...defaultData, notes: '' } }
   }
   return state.invoices[bookingId]
 }
@@ -272,6 +282,8 @@ export function markInvoicePaid(bookingId) {
 export function getMenageInvoice(missionKey, defaultData) {
   if (!state.menageInvoices[missionKey]) {
     state.menageInvoices[missionKey] = { data: { ...defaultData, notes: '' }, status: 'generee', paidAt: null }
+  } else if (!state.menageInvoices[missionKey].data) {
+    state.menageInvoices[missionKey] = { ...state.menageInvoices[missionKey], data: { ...defaultData, notes: '' } }
   }
   return state.menageInvoices[missionKey]
 }
@@ -315,6 +327,29 @@ export function respondMenageRequest(bookingId, accept) {
   if (!current) return
   state = { ...state, menageRequests: { ...state.menageRequests, [bookingId]: { ...current, status: accept ? 'acceptee' : 'refusee', answeredAt: new Date().toISOString() } } }
   listeners.forEach(fn => fn(state))
+}
+
+// ── Jours off des techniciens ──────────────────────────────────────
+export function isTechOff(techId, date) {
+  return (state.techDaysOff[techId] || []).some(o => date >= o.start && date <= o.end)
+}
+
+export function addTechDayOff(techId, start, end, label = 'Congés') {
+  if (!start) return
+  const entry = { id: 'off-' + Date.now(), start, end: end && end >= start ? end : start, label }
+  state = { ...state, techDaysOff: { ...state.techDaysOff, [techId]: [...(state.techDaysOff[techId] || []), entry] } }
+  listeners.forEach(fn => fn(state))
+}
+
+export function removeTechDayOff(techId, offId) {
+  state = { ...state, techDaysOff: { ...state.techDaysOff, [techId]: (state.techDaysOff[techId] || []).filter(o => o.id !== offId) } }
+  listeners.forEach(fn => fn(state))
+}
+
+// Remplit l'historique de démo (locations passées : contrats signés, factures réglées…)
+// sans écraser ce que l'utilisateur a déjà fait dans la session.
+export function seedState(patch) {
+  Object.entries(patch).forEach(([k, v]) => { state[k] = { ...v, ...state[k] } })
 }
 
 // Prévient tous les écrans qu'une donnée a changé (ex. nouvelle location ajoutée).

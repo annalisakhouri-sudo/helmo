@@ -3,8 +3,9 @@ import { Plus, X, Check, AlertTriangle, Bell, ChevronRight, MapPin, Calendar, Cl
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { TECHNICIANS } from '@/lib/mock-data'
-import { getMissionsForTech, getMissionTasks } from '@/lib/tech-missions'
-import { getState, subscribe, toggleTask as sharedToggleTask, assignMission, resolveMissionRequest } from '@/lib/shared-state'
+import { getMissionsForTech, getMissionTasks, getUnassignedMissions, getTechOptions } from '@/lib/tech-missions'
+import { getState, subscribe, toggleTask as sharedToggleTask, assignMission, resolveMissionRequest, addTechDayOff, removeTechDayOff } from '@/lib/shared-state'
+import { fmtDate } from '@/lib/dates'
 import { Card, SectionLabel } from '@/components/ui'
 
 const BASES = [
@@ -177,8 +178,9 @@ function PlanningTech({ tech, onClose, onToggleTask, onReassign }) {
                                       value={tech.id}
                                       onChange={e => onReassign(item.key, e.target.value)}
                                     >
-                                      {[tech, ...TECHNICIANS.filter(t => t.id !== tech.id)].map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                      <option value={tech.id}>{tech.name}</option>
+                                      {getTechOptions(item).filter(t => t.id !== tech.id).map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}{t.otherBase ? ' (autre base)' : ''}</option>
                                       ))}
                                     </select>
                                   </div>
@@ -213,6 +215,8 @@ export default function Techniciens() {
 
   const techs = buildTechsFromBookings(extraTechs)
   const openRequests = sharedState.missionRequests.filter(r => r.status === 'open')
+  const unassigned = getUnassignedMissions()
+  const [offForm, setOffForm] = useState(null) // { techId, start, end }
 
   function toggleTask(techId, missionKey, taskId) {
     sharedToggleTask(techId, missionKey, taskId)
@@ -238,30 +242,44 @@ export default function Techniciens() {
       <div className="topbar">
         <div>
           <h1 className="font-display text-base font-bold">Techniciens</h1>
-          <p className="text-xs text-gray-400">{techs.length} techniciens · {BASES.length} bases</p>
+          <p className="text-xs text-gray-400">{techs.length} techniciens · {BASES.map(b => b.name).join(' et ')}</p>
         </div>
         <button className="btn-primary" onClick={() => setShowNew(true)}><Plus size={14} /> Ajouter</button>
       </div>
 
       <div className="flex-1 overflow-auto p-5">
 
-        {/* Bases */}
-        <SectionLabel>Bases</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          {BASES.map(base => {
-            const baseTechs = techs.filter(t => t.base === base.name)
-            return (
-              <Card key={base.id}>
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin size={14} className="text-navy-600" />
-                  <p className="text-sm font-medium">{base.name}</p>
+        {/* Missions dont le responsable est en congé : à réassigner (autre base possible). */}
+        {unassigned.length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+              <SectionLabel>Missions à réassigner ({unassigned.length})</SectionLabel>
+              <select className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white" defaultValue="" onChange={e => {
+                const id = e.target.value; if (!id) return
+                // Confie toutes les missions à ce technicien, sauf celles où il est lui-même en congé.
+                unassigned.forEach(m => { if (getTechOptions(m).some(t => t.id === id)) reassign(m.key, id) })
+              }}>
+                <option value="">Tout confier à…</option>
+                {TECHNICIANS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              {unassigned.map(m => (
+                <div key={m.key} className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100">
+                  <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-amber-800 truncate">{m.boat} · {m.type === 'depart' ? 'Départ' : 'Retour'} · {fmtDate(m.date)} {m.heure}</p>
+                    <p className="text-[11px] text-amber-700">{TECHNICIANS.find(t => t.id === m.defaultTechId)?.name} est en congé</p>
+                  </div>
+                  <select className="text-xs border border-amber-200 rounded-lg px-2 py-1.5 bg-white flex-shrink-0" defaultValue="" onChange={e => e.target.value && reassign(m.key, e.target.value)}>
+                    <option value="">Confier à…</option>
+                    {getTechOptions(m).map(t => <option key={t.id} value={t.id}>{t.name}{t.otherBase ? ' (autre base)' : ''}</option>)}
+                  </select>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">{base.port}</p>
-                <p className="text-xs text-navy-600">{baseTechs.length} technicien{baseTechs.length > 1 ? 's' : ''}</p>
-              </Card>
-            )
-          })}
-        </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Demandes en attente des techniciens (empêchement, échange...) */}
         {openRequests.length > 0 && (
@@ -287,7 +305,7 @@ export default function Techniciens() {
                       }}
                     >
                       <option value="">Réassigner à…</option>
-                      {TECHNICIANS.filter(t => t.id !== req.techId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      {(mission ? getTechOptions(mission) : TECHNICIANS).filter(t => t.id !== req.techId).map(t => <option key={t.id} value={t.id}>{t.name}{t.otherBase ? ' (autre base)' : ''}</option>)}
                     </select>
                   </div>
                 )
@@ -304,8 +322,11 @@ export default function Techniciens() {
             const missions = tech.planning.length
             const enCours = tech.planning.filter(p => p.statut === 'en_cours').length
             const unread = tech.notifications.filter(n => !n.read).length
-            const totalDone = tech.planning.reduce((acc, p) => acc + p.tasks.filter(t => t.done).length, 0)
-            const totalTasks = tech.planning.reduce((acc, p) => acc + p.tasks.length, 0)
+            // Avancement de la semaine de rotation en cours (pas le cumul de l'année).
+            const thisWeek = tech.planning.filter(p => p.date >= '2026-07-04' && p.date < '2026-07-11')
+            const totalDone = thisWeek.reduce((acc, p) => acc + p.tasks.filter(t => t.done).length, 0)
+            const totalTasks = thisWeek.reduce((acc, p) => acc + p.tasks.length, 0)
+            const daysOff = (sharedState.techDaysOff[tech.id] || []).filter(o => o.end >= '2026-07-04')
             const pct = totalTasks > 0 ? Math.round((totalDone / totalTasks) * 100) : 0
 
             return (
@@ -339,9 +360,29 @@ export default function Techniciens() {
                         <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                           <div className={`h-1.5 rounded-full ${pct === 100 ? 'bg-teal-400' : 'bg-amber-300'}`} style={{ width: `${pct}%` }} />
                         </div>
-                        <span className="text-[10px] text-gray-400">{totalDone}/{totalTasks}</span>
+                        <span className="text-[10px] text-gray-400">cette semaine {totalDone}/{totalTasks}</span>
                       </div>
                     )}
+                    {/* Jours off : le technicien n'est pas proposé ces jours-là */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                      {daysOff.map(o => (
+                        <span key={o.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+                          {o.label} {o.start === o.end ? fmtDate(o.start) : `${fmtDate(o.start)} → ${fmtDate(o.end)}`}
+                          <button className="text-gray-400 hover:text-danger-600" onClick={() => removeTechDayOff(tech.id, o.id)}><X size={10} /></button>
+                        </span>
+                      ))}
+                      {offForm?.techId === tech.id ? (
+                        <span className="flex items-center gap-1">
+                          <input type="date" className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5" value={offForm.start} onChange={e => setOffForm(f => ({ ...f, start: e.target.value }))} />
+                          <span className="text-[10px] text-gray-400">→</span>
+                          <input type="date" className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5" value={offForm.end} onChange={e => setOffForm(f => ({ ...f, end: e.target.value }))} />
+                          <button className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-navy-600 text-white" onClick={() => { addTechDayOff(tech.id, offForm.start, offForm.end); setOffForm(null) }}>OK</button>
+                          <button className="text-gray-400" onClick={() => setOffForm(null)}><X size={11} /></button>
+                        </span>
+                      ) : (
+                        <button className="text-[10px] font-medium text-navy-600 hover:underline" onClick={() => setOffForm({ techId: tech.id, start: '', end: '' })}>+ Jours off</button>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     {enCours > 0 && <span className="pill-warn text-[10px]">{enCours} en cours</span>}

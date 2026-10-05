@@ -54,7 +54,7 @@ export function buildAllMenageMissions() {
     const basePrice = menageOption?.price || 70
     const invoice = invoices[key]
     // Montant réel = celui de la facture si l'agence l'a ajusté, sinon le tarif de l'option.
-    const amount = invoice ? invoice.data.lineItems.reduce((n, li) => n + (Number(li.amount) || 0), 0) : basePrice
+    const amount = invoice?.data ? invoice.data.lineItems.reduce((n, li) => n + (Number(li.amount) || 0), 0) : basePrice
     const isDone = !!done[key]
     const isPaid = invoice?.status === 'payee'
     missions.push({

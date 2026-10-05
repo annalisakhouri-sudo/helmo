@@ -1,4 +1,4 @@
-// Génère une saison de démo réaliste sur UN AN (juillet 2026 → juin 2027).
+// Génère une saison de démo réaliste (janvier 2026 → juin 2027).
 // Déterministe (même résultat à chaque chargement) : la démo est identique pour tout le monde.
 // - Taux de remplissage selon la saison (plein en été, quasi vide l'hiver).
 // - Clients : la plupart font 1 à 3 locations, quelques fidèles 4-5.
@@ -26,8 +26,9 @@ const WEEKLY_FILL = { 1: 0.02, 2: 0.03, 3: 0.06, 4: 0.25, 5: 0.45, 6: 0.75, 7: 0
 // Sorties à la journée (Locamotors) : nombre moyen de jours loués par bateau et par semaine.
 const DAY_TRIPS_PER_WEEK = { 1: 0, 2: 0, 3: 0.2, 4: 0.6, 5: 1.2, 6: 2.2, 7: 3.2, 8: 3.2, 9: 1.8, 10: 0.8, 11: 0.1, 12: 0.1 }
 
-const START = '2026-07-04' // samedi — « aujourd'hui » dans la démo
-const WEEKS = 52
+// Janvier 2026 → juin 2027 : un historique avant « aujourd'hui » (4 juillet 2026) et la saison suivante.
+const START = '2026-01-03' // samedi
+const WEEKS = 78
 
 const FIRST = ['Julien','Camille','Thomas','Léa','Nicolas','Chloé','Antoine','Manon','Maxime','Sarah','Hugo','Emma','Lucas','Inès','Louis','Clara','Arthur','Pauline','Romain','Marion','Paul','Lucie','Alexandre','Juliette','Mathieu','Anaïs','Benoît','Élodie','Vincent','Margaux','Guillaume','Laura','Sébastien','Charlotte','Olivier','Aurélie','Damien','Mélanie','Florian','Céline','Kevin','Audrey','Yann','Noémie','Cédric','Justine','Marc','Valérie','Pierre','Nathalie','Fabien','Sandrine','Jérôme','Isabelle','Matthias','Hélène','Bastien','Agathe','Raphaël','Zoé']
 const LAST = ['Martin','Bernard','Dubois','Thomas','Robert','Richard','Petit','Durand','Leroy','Simon','Laurent','Lefebvre','Michel','Garcia','David','Bertrand','Roux','Vincent','Fournier','Morel','Girard','André','Mercier','Dupont','Lambert','Bonnet','François','Martinez','Legrand','Garnier','Faure','Rousseau','Blanc','Guerin','Muller','Henry','Roussel','Nicolas','Perrin','Morin','Mathieu','Clement','Gauthier','Dumont','Lopez','Fontaine','Chevalier','Robin','Masson','Sanchez','Gerard','Nguyen','Boyer','Denis','Lemaire','Duval','Joly','Gautier','Roger','Roche']
@@ -129,8 +130,22 @@ function buildBookings(boats, skippers) {
 }
 
 // ── 2. Les clients : la plupart 1 à 3 locations ──────────────────────
+// Garantit qu'au moins une location « skipper à trouver » soit faisable par Jean-Marc
+// (le skipper de la session démo) : on libère sa semaine si besoin.
+function freeJeanMarc(bookings, skippers) {
+  const target = bookings.find(b => b.needsSkipper && !b.skipperId)
+  if (!target) return
+  const overlaps = (a, b) => a.start < b.end && b.start < a.end
+  bookings.filter(b => b.skipperId === 'skip-1' && overlaps(b, target)).forEach(b => {
+    const other = skippers.find(s => s.id !== 'skip-1' && !bookings.some(o => o.skipperId === s.id && overlaps(o, b)))
+    if (other) Object.assign(b, { skipperId: other.id, skipperName: other.name, skipperInitials: other.initials })
+    else Object.assign(b, { skipperId: null, skipperName: b.client, skipperInitials: '', clientIsSkipper: true })
+  })
+}
+
 export function generateDemo(boats, skippers, baseClients) {
   const bookings = buildBookings(boats, skippers)
+  freeJeanMarc(bookings, skippers)
 
   // Répartition : 25 % 1 loc, 40 % 2, 25 % 3, 10 % 4-5.
   const slots = []
@@ -170,6 +185,7 @@ export function generateDemo(boats, skippers, baseClients) {
     b.clientId = c.id
     b.client = `${c.nom} ${c.prenom}`
     b.phone = c.tel
+    if (b.clientIsSkipper) { b.skipperName = b.client; b.skipperInitials = (c.nom[0] + c.prenom[0]).toUpperCase() }
     c.locations.push(b.id)
     byClient.set(c.id, [...(byClient.get(c.id) || []), b])
   })
