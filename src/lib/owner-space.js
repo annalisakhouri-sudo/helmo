@@ -158,6 +158,18 @@ export function getUpcomingWeeks(owner = DEMO_OWNER, count = 16) {
   })
 }
 
+// État d'un jour pour le calendrier du propriétaire : 'passe' | 'mine' | 'loue' | 'libre'.
+// Un jour est occupé du jour de départ jusqu'à la veille du retour (le jour du retour, le bateau
+// se libère pour le suivant : c'est la rotation du samedi).
+export function getDayState(owner, day) {
+  const p = { start: day, end: day }
+  const block = getOwnerBlocks(owner.id).find(b => overlaps(b, p))
+  if (block) return { state: 'mine', block }
+  if (getBoatRentals(owner.boatId).some(r => overlaps(r, p))) return { state: 'loue' }
+  if (day < TODAY) return { state: 'passe' }
+  return { state: 'libre' }
+}
+
 // ── Réserver son bateau (dates bloquées) ─────────────────────────────
 export const getOwnerBlocks = ownerId => state.blocks.filter(b => b.ownerId === ownerId).sort((a, b) => a.start.localeCompare(b.start))
 export function getAllBlocks() { return state.blocks.map(b => ({ ...b, boatId: OWNERS.find(o => o.id === b.ownerId)?.boatId })) }

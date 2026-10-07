@@ -1,203 +1,257 @@
 // Espace propriétaire — DÉMO (décision du 07/10/2026), à tester avec Marie.
-// Pour le propriétaire du bateau, souvent une personne âgée : tout doit être évident.
-// Principes : une seule action par écran, gros boutons avec un texte (jamais une icône seule),
-// des phrases complètes, une confirmation avant chaque engagement, un bouton « Retour » partout.
+// Pour le propriétaire du bateau, souvent une personne âgée : simple ET soigné.
+// Principes : le planning est un vrai calendrier (comme un agenda papier), on réserve en
+// touchant le jour de départ puis le jour de retour ; textes lisibles, boutons nommés (jamais
+// une icône seule), dates en toutes lettres, confirmation avant chaque engagement, « Retour » partout.
 // Il voit tout sur SON bateau, sauf les locataires (il sait seulement que le bateau est loué).
 // L'agence traite ses demandes dans son onglet « Propriétaires » (src/pages/GestionLocative.jsx).
 // Logique : src/lib/owner-space.js.
 import { useState, useEffect, useRef } from 'react'
-import { CalendarDays, Wrench, MessageCircle, ClipboardCheck, Euro, ArrowLeft, Check, Sparkles, Anchor, Hammer, Ship, LogOut, ChevronRight } from 'lucide-react'
+import { Wrench, MessageCircle, ClipboardCheck, Euro, ArrowLeft, Check, Sparkles, Anchor, Hammer, LogOut, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import {
   DEMO_OWNER, SERVICE_TYPES, SERVICE_STATUS, TODAY, serviceLabel,
-  subscribeOwner, getOwnerState, getVisibility, getOwnerBoat, getBoatStatusToday, getUpcomingWeeks,
+  subscribeOwner, getVisibility, getOwnerBoat, getBoatStatusToday, getDayState,
   getOwnerBlocks, addBlock, removeBlock, getRevenue, getBoatHistory, getOwnerServices, requestService,
   getOwnerMessages, sendOwnerMessage, getUnread, markRead,
 } from '@/lib/owner-space'
 
 const owner = DEMO_OWNER
 const eur = n => n.toLocaleString('fr-FR') + ' €'
-// Dates écrites en toutes lettres : « samedi 11 juillet ».
-const longDate = (s, withYear = false) => new Date(s + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}) })
+const longDate = s => new Date(s + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+const addDays = (s, n) => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+const nights = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000)
 const SERVICE_ICONS = { preparation: Anchor, menage: Sparkles, entretien: Wrench, sav: Hammer }
+const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
 function BackButton({ onClick }) {
   return (
-    <button type="button" onClick={onClick} className="self-start flex items-center gap-2 min-h-[48px] px-4 rounded-xl bg-white border border-gray-200 text-base font-medium text-gray-700 hover:bg-gray-50">
+    <button type="button" onClick={onClick} className="self-start flex items-center gap-2 min-h-[44px] pr-3 text-base font-medium text-navy-600 hover:text-navy-800">
       <ArrowLeft size={20} /> Retour
     </button>
   )
 }
 
-function BigButton({ icon: Icon, title, sub, onClick, badge, tone = 'primary' }) {
-  const primary = tone === 'primary'
-  return (
-    <button type="button" onClick={onClick} className={`w-full flex items-center gap-4 p-5 rounded-2xl text-left transition-colors ${primary ? 'bg-navy-600 hover:bg-navy-800 text-white' : 'bg-white hover:bg-gray-50 border border-gray-200 text-gray-900'}`}>
-      <span className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${primary ? 'bg-white/15' : 'bg-navy-50'}`}>
-        <Icon size={28} className={primary ? 'text-white' : 'text-navy-600'} />
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-xl font-semibold leading-tight">{title}</span>
-        {sub && <span className={`block text-base mt-1 ${primary ? 'text-navy-50' : 'text-gray-500'}`}>{sub}</span>}
-      </span>
-      {badge && <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-sm font-semibold flex-shrink-0">{badge}</span>}
-      <ChevronRight size={26} className={`flex-shrink-0 ${primary ? 'text-white/70' : 'text-gray-400'}`} />
-    </button>
-  )
+function Card({ children, className = '' }) {
+  return <div className={`rounded-2xl bg-white border border-gray-100 shadow-[0_1px_3px_rgba(16,24,40,0.06)] ${className}`}>{children}</div>
 }
 
-function Title({ children, sub }) {
+function Done({ text, sub, onBack }) {
   return (
-    <div>
-      <h1 className="font-display text-2xl font-bold text-gray-900">{children}</h1>
-      {sub && <p className="text-lg text-gray-600 mt-1">{sub}</p>}
+    <div className="flex flex-col gap-5">
+      <Card className="p-7 flex flex-col items-center text-center gap-3">
+        <span className="w-14 h-14 rounded-full bg-teal-400 flex items-center justify-center"><Check size={30} className="text-white" strokeWidth={3} /></span>
+        <p className="text-xl font-semibold text-gray-900">{text}</p>
+        {sub && <p className="text-base text-gray-600">{sub}</p>}
+      </Card>
+      <button type="button" onClick={onBack} className="btn-primary justify-center text-base min-h-[52px] rounded-xl">Revenir à mon bateau</button>
     </div>
   )
 }
 
-// ── Accueil ──
+// ── Le calendrier du bateau : on voit, et on réserve en touchant les jours ──
+// Le mois affiché est gardé par l'accueil : après une réservation, on revient au même mois.
+function BoatCalendar({ month, setMonth, onReserved }) {
+  const vis = getVisibility(owner.id)
+  const [sel, setSel] = useState(null)       // { start, end? }
+  const [focus, setFocus] = useState(null)   // jour touché qui n'est pas libre
+  const [confirm, setConfirm] = useState(null) // { action, start, end, blockId }
+  const [error, setError] = useState('')
+
+  const [y, m] = month.split('-').map(Number)
+  const first = `${month}-01`
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const offset = (new Date(first + 'T12:00:00').getDay() + 6) % 7 // lundi = 0
+  const cells = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)]
+  const monthLabel = new Date(first + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  const shiftMonth = n => { const d = new Date(y, m - 1 + n, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`) }
+  const canGoBack = month > TODAY.slice(0, 7)
+
+  // Les jours entre le départ et la veille du retour doivent tous être libres.
+  const rangeFree = (a, b) => { for (let d = a; d < b; d = addDays(d, 1)) if (getDayState(owner, d).state !== 'libre') return false; return true }
+
+  function tap(day) {
+    setError('')
+    const { state, block } = getDayState(owner, day)
+    if (state === 'passe') return
+    if (state !== 'libre' && !(sel && !sel.end && day > sel.start)) { setSel(null); setFocus({ day, state, block }); return }
+    setFocus(null)
+    if (!sel || sel.end) { setSel({ start: day }); return }
+    if (day <= sel.start) { setSel({ start: day }); return }
+    if (!rangeFree(sel.start, day)) { setError('Votre bateau n\'est pas libre sur toute cette période. Choisissez d\'autres dates.'); setSel(null); return }
+    setSel({ start: sel.start, end: day })
+  }
+
+  const inSel = d => sel && (sel.end ? d >= sel.start && d <= sel.end : d === sel.start)
+  // Raccourci : un samedi libre → toute la semaine (rotation samedi → samedi).
+  const weekShortcut = sel && !sel.end && new Date(sel.start + 'T12:00:00').getDay() === 6 && rangeFree(sel.start, addDays(sel.start, 7))
+
+  function validate() {
+    if (confirm.action === 'remove') { removeBlock(confirm.blockId); onReserved('remove', confirm) }
+    else {
+      const res = addBlock(owner.id, confirm.start, confirm.end)
+      if (!res.ok) { setError(res.error); setConfirm(null); return }
+      onReserved('add', confirm)
+    }
+    setConfirm(null); setSel(null); setFocus(null)
+  }
+
+  if (confirm) return (
+    <Card className="p-6 flex flex-col gap-5">
+      <p className="font-display text-xl font-bold text-gray-900">{confirm.action === 'add' ? 'Vous confirmez ?' : 'Annuler cette réservation ?'}</p>
+      <p className="text-lg text-gray-800 leading-relaxed">
+        {confirm.action === 'add'
+          ? <>Vous gardez votre bateau <strong>du {longDate(confirm.start)}</strong> <strong>au {longDate(confirm.end)}</strong>. Il ne sera pas loué ces jours-là.</>
+          : <>Votre bateau pourra de nouveau être loué du {longDate(confirm.start)} au {longDate(confirm.end)}.</>}
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button type="button" onClick={validate} className="btn-primary justify-center text-base min-h-[52px] rounded-xl flex-1"><Check size={20} /> {confirm.action === 'add' ? 'Oui, je réserve' : 'Oui, j\'annule'}</button>
+        <button type="button" onClick={() => setConfirm(null)} className="btn-ghost justify-center text-base min-h-[52px] rounded-xl flex-1 text-gray-700">Non, revenir</button>
+      </div>
+    </Card>
+  )
+
+  return (
+    <Card className="p-4 sm:p-5 flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => shiftMonth(-1)} disabled={!canGoBack} className="w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 disabled:opacity-30" aria-label="Mois précédent"><ChevronLeft size={22} /></button>
+        <p className="flex-1 text-center font-display text-lg font-bold text-gray-900 first-letter:uppercase">{monthLabel}</p>
+        <button type="button" onClick={() => shiftMonth(1)} className="w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50" aria-label="Mois suivant"><ChevronRight size={22} /></button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {WEEKDAYS.map(w => <p key={w} className={`text-center text-xs font-semibold uppercase tracking-wide pb-1 ${w === 'Sam' ? 'text-navy-600' : 'text-gray-400'}`}>{w}</p>)}
+        {cells.map((d, i) => {
+          if (!d) return <span key={'e' + i} />
+          const { state } = getDayState(owner, d)
+          const selected = inSel(d)
+          const past = d < TODAY
+          const cls = selected
+            ? 'bg-amber-200 text-amber-900 ring-2 ring-amber-400'
+            : state === 'mine' ? 'bg-teal-400 text-white'
+              : state === 'loue' ? 'bg-navy-600 text-white'
+                : past ? 'text-gray-300'
+                  : 'bg-gray-50 text-gray-900 hover:bg-amber-50'
+          return (
+            <button key={d} type="button" onClick={() => tap(d)} disabled={past && state !== 'mine' && state !== 'loue'}
+              aria-label={`${longDate(d)} : ${state === 'mine' ? 'réservé pour vous' : state === 'loue' ? (vis.locations ? 'loué' : 'indisponible') : past ? 'passé' : 'libre'}`}
+              className={`h-12 sm:h-14 rounded-lg text-base font-medium flex items-center justify-center transition-colors ${cls} ${past && !selected ? 'opacity-50' : ''} ${d === TODAY ? 'outline outline-2 outline-offset-1 outline-gray-900' : ''}`}>
+              {Number(d.slice(8))}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-600">
+        <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-navy-600" />{vis.locations ? 'Loué' : 'Indisponible'}</span>
+        <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-teal-400" />Pour vous</span>
+        <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gray-50 border border-gray-200" />Libre</span>
+      </div>
+
+      {error && <p className="rounded-xl bg-danger-50 text-danger-800 text-base p-3">{error}</p>}
+
+      {/* Ce qui se passe après un toucher : une seule boîte, toujours au même endroit. */}
+      <div className="rounded-xl bg-gray-50 p-4">
+        {!sel && !focus && <p className="text-base text-gray-700">Pour naviguer sur votre bateau : <strong>touchez le jour de départ</strong>, puis le jour de retour.</p>}
+
+        {sel && !sel.end && (
+          <div className="flex flex-col gap-3">
+            <p className="text-base text-gray-800">Départ le <strong>{longDate(sel.start)}</strong>. Touchez maintenant le <strong>jour de retour</strong>.</p>
+            <div className="flex flex-wrap gap-2">
+              {weekShortcut && <button type="button" onClick={() => setConfirm({ action: 'add', start: sel.start, end: addDays(sel.start, 7) })} className="btn-primary text-base min-h-[48px] rounded-xl">Toute la semaine, jusqu'au samedi suivant</button>}
+              <button type="button" onClick={() => setSel(null)} className="btn-ghost text-base min-h-[48px] rounded-xl text-gray-700"><X size={18} /> Effacer</button>
+            </div>
+          </div>
+        )}
+
+        {sel?.end && (
+          <div className="flex flex-col gap-3">
+            <p className="text-base text-gray-800">Du <strong>{longDate(sel.start)}</strong> au <strong>{longDate(sel.end)}</strong> · {nights(sel.start, sel.end)} nuit{nights(sel.start, sel.end) > 1 ? 's' : ''}.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setConfirm({ action: 'add', start: sel.start, end: sel.end })} className="btn-primary text-base min-h-[48px] rounded-xl">Réserver ces dates</button>
+              <button type="button" onClick={() => setSel(null)} className="btn-ghost text-base min-h-[48px] rounded-xl text-gray-700"><X size={18} /> Effacer</button>
+            </div>
+          </div>
+        )}
+
+        {focus?.state === 'mine' && (
+          <div className="flex flex-col gap-3">
+            <p className="text-base text-gray-800">Votre bateau est réservé pour vous du <strong>{longDate(focus.block.start)}</strong> au <strong>{longDate(focus.block.end)}</strong>.</p>
+            {focus.block.start >= TODAY && <button type="button" onClick={() => setConfirm({ action: 'remove', blockId: focus.block.id, start: focus.block.start, end: focus.block.end })} className="btn-ghost self-start text-base min-h-[48px] rounded-xl text-gray-700">Annuler cette réservation</button>}
+          </div>
+        )}
+        {focus?.state === 'loue' && <p className="text-base text-gray-800">Le {longDate(focus.day)}, votre bateau est {vis.locations ? 'loué' : 'indisponible'}. Pour en parler, écrivez à l'agence.</p>}
+      </div>
+    </Card>
+  )
+}
+
+// ── Accueil = mon bateau ──
 function Home({ go }) {
   const boat = getOwnerBoat()
   const vis = getVisibility(owner.id)
   const status = getBoatStatusToday()
   const unread = getUnread('owner', owner.id)
-  const myDates = getOwnerBlocks(owner.id).filter(b => b.end >= TODAY)
-  const myRequests = getOwnerServices(owner.id).filter(s => s.status === 'envoyee' || s.status === 'acceptee')
-  const statusText = status.kind === 'mine'
-    ? `Votre bateau est à vous jusqu'au ${longDate(status.until)}.`
-    : status.kind === 'loue'
-      ? `Votre bateau est ${vis.locations ? 'loué' : 'occupé'} jusqu'au ${longDate(status.until)}.`
-      : 'Votre bateau est au port.'
-
-  return (
-    <div className="flex flex-col gap-5">
-      <Title>Bonjour {owner.firstName}</Title>
-
-      <div className="rounded-2xl bg-white border border-gray-200 p-5 flex items-center gap-4">
-        <span className="w-14 h-14 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0"><Ship size={28} className="text-teal-600" /></span>
-        <div className="min-w-0">
-          <p className="text-xl font-semibold text-gray-900">{boat.name}</p>
-          <p className="text-lg text-gray-700 mt-0.5">{statusText}</p>
-          <p className="text-base text-gray-500 mt-0.5">Géré par Midi Nautisme · {boat.port}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <BigButton icon={CalendarDays} title="Réserver mon bateau" sub="Choisir des dates pour naviguer" onClick={() => go('reserver')} />
-        <BigButton icon={Wrench} title="Demander un service" sub="Préparation, ménage, entretien, réparation" onClick={() => go('service')} />
-        <BigButton icon={MessageCircle} title="Écrire à l'agence" sub="Poser une question à Midi Nautisme" onClick={() => go('messages')} badge={unread ? `${unread} nouveau${unread > 1 ? 'x' : ''}` : null} />
-      </div>
-
-      {(vis.suivi || vis.revenus) && (
-        <div className="flex flex-col gap-3">
-          {vis.suivi && <BigButton tone="light" icon={ClipboardCheck} title="Suivi de mon bateau" sub="Ce qui a été fait dessus" onClick={() => go('suivi')} />}
-          {vis.revenus && <BigButton tone="light" icon={Euro} title="Mes revenus" sub="Ce que rapportent les locations" onClick={() => go('revenus')} />}
-        </div>
-      )}
-
-      {(myDates.length > 0 || myRequests.length > 0) && (
-        <div className="rounded-2xl bg-white border border-gray-200 p-5 flex flex-col gap-3">
-          <p className="text-lg font-semibold text-gray-900">En ce moment</p>
-          {myDates.map(b => (
-            <p key={b.id} className="text-base text-gray-700 flex gap-2"><CalendarDays size={20} className="text-teal-600 flex-shrink-0 mt-0.5" />Bateau réservé pour vous du {longDate(b.start)} au {longDate(b.end)}.</p>
-          ))}
-          {myRequests.map(s => (
-            <p key={s.id} className="text-base text-gray-700 flex gap-2"><Wrench size={20} className="text-navy-600 flex-shrink-0 mt-0.5" />{serviceLabel(s.type)} : {SERVICE_STATUS[s.status].toLowerCase()}.</p>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Réserver mon bateau ──
-function Reserver({ back }) {
-  const vis = getVisibility(owner.id)
-  const weeks = getUpcomingWeeks(owner, 16)
-  const [confirm, setConfirm] = useState(null) // { action: 'add' | 'remove', start, end, blockId }
   const [done, setDone] = useState(null)
-  const [custom, setCustom] = useState(false)
-  const [form, setForm] = useState({ start: '', end: '' })
-  const [error, setError] = useState('')
+  const [month, setMonth] = useState(TODAY.slice(0, 7)) // 'AAAA-MM'
+  const openRequests = getOwnerServices(owner.id).filter(s => s.status === 'envoyee' || s.status === 'acceptee')
+  const statusText = status.kind === 'mine' ? `À vous jusqu'au ${longDate(status.until)}`
+    : status.kind === 'loue' ? `${vis.locations ? 'Loué' : 'Occupé'} jusqu'au ${longDate(status.until)}`
+      : 'Au port, disponible'
 
-  function validate() {
-    if (confirm.action === 'remove') { removeBlock(confirm.blockId); setDone('Votre réservation est annulée. Le bateau peut de nouveau être loué ces jours-là.') }
-    else {
-      const res = addBlock(owner.id, confirm.start, confirm.end)
-      if (!res.ok) { setError(res.error); setConfirm(null); return }
-      setDone(`C'est noté : votre bateau est à vous du ${longDate(confirm.start)} au ${longDate(confirm.end)}. L'agence est prévenue.`)
-    }
-    setConfirm(null); setError('')
-    window.scrollTo({ top: 0 })
-  }
+  if (done) return <Done text={done.action === 'add' ? 'C\'est noté, votre bateau est à vous.' : 'Votre réservation est annulée.'}
+    sub={done.action === 'add' ? `Du ${longDate(done.start)} au ${longDate(done.end)}. L'agence est prévenue.` : 'Le bateau peut de nouveau être loué ces jours-là.'}
+    onBack={() => setDone(null)} />
 
-  if (done) return (
-    <div className="flex flex-col gap-5">
-      <div className="rounded-2xl bg-teal-50 border border-teal-100 p-6 flex flex-col items-center text-center gap-3">
-        <span className="w-16 h-16 rounded-full bg-teal-400 flex items-center justify-center"><Check size={34} className="text-white" strokeWidth={3} /></span>
-        <p className="text-xl text-teal-900 font-semibold">{done}</p>
-      </div>
-      <button type="button" onClick={back} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl">Revenir à l'accueil</button>
-    </div>
-  )
-
-  if (confirm) return (
-    <div className="flex flex-col gap-5">
-      <Title>{confirm.action === 'add' ? 'Vous confirmez ?' : 'Annuler cette réservation ?'}</Title>
-      <div className="rounded-2xl bg-white border border-gray-200 p-6">
-        <p className="text-xl text-gray-900">
-          {confirm.action === 'add'
-            ? <>Vous gardez votre bateau du <strong>{longDate(confirm.start)}</strong> au <strong>{longDate(confirm.end)}</strong>.</>
-            : <>Votre bateau pourra de nouveau être loué du <strong>{longDate(confirm.start)}</strong> au <strong>{longDate(confirm.end)}</strong>.</>}
-        </p>
-        {confirm.action === 'add' && <p className="text-lg text-gray-600 mt-2">Il ne sera pas loué ces jours-là.</p>}
-      </div>
-      <button type="button" onClick={validate} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl"><Check size={22} /> {confirm.action === 'add' ? 'Oui, je réserve' : 'Oui, j\'annule'}</button>
-      <button type="button" onClick={() => setConfirm(null)} className="btn-ghost justify-center text-lg min-h-[56px] rounded-xl text-gray-700">Non, revenir</button>
-    </div>
+  const Tile = ({ icon: Icon, title, sub, onClick, badge }) => (
+    <button type="button" onClick={onClick} className="relative flex flex-col items-start gap-3 p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:border-navy-200 text-left min-h-[120px]">
+      <span className="w-11 h-11 rounded-xl bg-navy-50 flex items-center justify-center"><Icon size={22} className="text-navy-600" /></span>
+      <span>
+        <span className="block text-base font-semibold text-gray-900 leading-snug">{title}</span>
+        {sub && <span className="block text-sm text-gray-500 mt-0.5">{sub}</span>}
+      </span>
+      {badge > 0 && <span className="absolute top-3 right-3 min-w-[24px] h-6 px-2 rounded-full bg-danger-400 text-white text-sm font-bold flex items-center justify-center">{badge}</span>}
+    </button>
   )
 
   return (
     <div className="flex flex-col gap-5">
-      <BackButton onClick={back} />
-      <Title sub="Touchez « Réserver » sur une semaine libre.">Réserver mon bateau</Title>
-      {error && <p className="rounded-xl bg-danger-50 text-danger-800 text-lg p-4">{error}</p>}
-
-      <ul className="flex flex-col gap-2">
-        {weeks.map(w => (
-          <li key={w.start} className={`rounded-2xl border p-4 flex flex-wrap items-center gap-3 ${w.state === 'mine' ? 'bg-teal-50 border-teal-100' : w.state === 'loue' ? 'bg-gray-100 border-gray-100' : 'bg-white border-gray-200'}`}>
-            <div className="flex-1 min-w-[200px]">
-              <p className="text-lg font-medium text-gray-900 first-letter:uppercase">{longDate(w.start)}</p>
-              <p className="text-base text-gray-600">au {longDate(w.end)}</p>
-            </div>
-            {w.state === 'libre' && <button type="button" onClick={() => setConfirm({ action: 'add', start: w.start, end: w.end })} className="btn-primary text-lg min-h-[52px] px-6 rounded-xl">Réserver</button>}
-            {w.state === 'loue' && <span className="text-lg text-gray-500 px-2">{vis.locations ? 'Loué' : 'Indisponible'}</span>}
-            {w.state === 'mine' && <>
-              <span className="text-lg font-semibold text-teal-800 flex items-center gap-1.5"><Check size={20} /> Pour vous</span>
-              <button type="button" onClick={() => { const b = getOwnerBlocks(owner.id).find(x => x.id === w.blockId); setConfirm({ action: 'remove', blockId: w.blockId, start: b.start, end: b.end }) }} className="btn-ghost text-base min-h-[48px] rounded-xl text-gray-700">Annuler</button>
-            </>}
-          </li>
-        ))}
-      </ul>
-
-      <div className="rounded-2xl bg-white border border-gray-200 p-5 flex flex-col gap-4">
-        {!custom
-          ? <button type="button" onClick={() => setCustom(true)} className="text-lg text-navy-600 font-medium text-left min-h-[48px]">Seulement quelques jours ? Choisir d'autres dates</button>
-          : <>
-            <p className="text-lg font-semibold text-gray-900">Choisir mes dates</p>
-            <label className="text-lg text-gray-700">Je pars le
-              <input type="date" min={TODAY} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 min-h-[52px]" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} />
-            </label>
-            <label className="text-lg text-gray-700">Je rends le bateau le
-              <input type="date" min={form.start || TODAY} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 min-h-[52px]" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} />
-            </label>
-            <button type="button" disabled={!form.start || !form.end} onClick={() => setConfirm({ action: 'add', start: form.start, end: form.end })} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl disabled:opacity-40">Continuer</button>
-          </>}
+      <div>
+        <p className="text-base text-gray-500">Bonjour {owner.firstName},</p>
+        <h1 className="font-display text-2xl font-bold text-gray-900">{boat.name}</h1>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${status.kind === 'port' ? 'bg-gray-100 text-gray-700' : status.kind === 'mine' ? 'bg-teal-50 text-teal-800' : 'bg-navy-50 text-navy-800'}`}>
+            <span className={`w-2 h-2 rounded-full ${status.kind === 'port' ? 'bg-gray-400' : status.kind === 'mine' ? 'bg-teal-400' : 'bg-navy-600'}`} />{statusText}
+          </span>
+          <span className="text-sm text-gray-500">{boat.port} · géré par Midi Nautisme</span>
+        </div>
       </div>
+
+      <BoatCalendar month={month} setMonth={setMonth} onReserved={(action, c) => { setDone({ action, ...c }); window.scrollTo({ top: 0 }) }} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Tile icon={Wrench} title="Demander un service" sub="Préparation, ménage, réparation…" onClick={() => go('service')} />
+        <Tile icon={MessageCircle} title="Écrire à l'agence" sub="Midi Nautisme" onClick={() => go('messages')} badge={unread} />
+        {vis.suivi && <Tile icon={ClipboardCheck} title="Suivi du bateau" sub="Ce qui a été fait" onClick={() => go('suivi')} />}
+        {vis.revenus && <Tile icon={Euro} title="Mes revenus" sub="Saison 2026" onClick={() => go('revenus')} />}
+      </div>
+
+      {openRequests.length > 0 && (
+        <Card className="p-5 flex flex-col gap-3">
+          <p className="text-base font-semibold text-gray-900">Mes demandes en cours</p>
+          {openRequests.map(s => (
+            <div key={s.id} className="flex items-center gap-3">
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.status === 'acceptee' ? 'bg-teal-400' : 'bg-amber-200'}`} />
+              <p className="text-base text-gray-800 flex-1">{serviceLabel(s.type)}{s.date && <span className="text-gray-500"> · {longDate(s.date)}</span>}</p>
+              <p className="text-sm text-gray-500 text-right">{s.status === 'acceptee' ? 'Acceptée' : 'En attente'}</p>
+            </div>
+          ))}
+        </Card>
+      )}
     </div>
   )
 }
 
-// ── Demander un service : 1) quoi, 2) quand et précisions, 3) c'est envoyé ──
+// ── Demander un service : quoi, puis quand et précisions, puis c'est envoyé ──
 function Service({ back }) {
   const [type, setType] = useState(null)
   const [date, setDate] = useState('')
@@ -205,30 +259,23 @@ function Service({ back }) {
   const [sent, setSent] = useState(false)
   const mine = getOwnerServices(owner.id)
 
-  if (sent) return (
-    <div className="flex flex-col gap-5">
-      <div className="rounded-2xl bg-teal-50 border border-teal-100 p-6 flex flex-col items-center text-center gap-3">
-        <span className="w-16 h-16 rounded-full bg-teal-400 flex items-center justify-center"><Check size={34} className="text-white" strokeWidth={3} /></span>
-        <p className="text-xl text-teal-900 font-semibold">Votre demande est envoyée.</p>
-        <p className="text-lg text-teal-800">Midi Nautisme va vous répondre. Vous verrez la réponse sur l'accueil.</p>
-      </div>
-      <button type="button" onClick={back} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl">Revenir à l'accueil</button>
-    </div>
-  )
+  if (sent) return <Done text="Votre demande est envoyée." sub="Midi Nautisme va vous répondre. Vous verrez la réponse sur votre page." onBack={back} />
 
   if (type) {
     const T = SERVICE_TYPES.find(t => t.id === type)
     return (
       <div className="flex flex-col gap-5">
         <BackButton onClick={() => setType(null)} />
-        <Title>{T.label}</Title>
-        <label className="text-lg text-gray-700">Pour quel jour ? <span className="text-gray-500">(si vous savez)</span>
-          <input type="date" min={TODAY} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 min-h-[52px] bg-white" value={date} onChange={e => setDate(e.target.value)} />
-        </label>
-        <label className="text-lg text-gray-700">Un détail à ajouter ? <span className="text-gray-500">(facultatif)</span>
-          <textarea rows={3} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 py-2 bg-white" placeholder="Par exemple : draps pour 6 personnes" value={note} onChange={e => setNote(e.target.value)} />
-        </label>
-        <button type="button" onClick={() => { requestService(owner.id, type, date, note); setSent(true); window.scrollTo({ top: 0 }) }} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl">Envoyer ma demande</button>
+        <h1 className="font-display text-2xl font-bold text-gray-900">{T.label}</h1>
+        <Card className="p-5 flex flex-col gap-4">
+          <label className="text-base font-medium text-gray-800">Pour quel jour ? <span className="font-normal text-gray-500">(si vous savez)</span>
+            <input type="date" min={TODAY} className="block w-full mt-1.5 text-base border border-gray-300 rounded-xl px-3 min-h-[50px] bg-white" value={date} onChange={e => setDate(e.target.value)} />
+          </label>
+          <label className="text-base font-medium text-gray-800">Un détail à ajouter ? <span className="font-normal text-gray-500">(facultatif)</span>
+            <textarea rows={3} className="block w-full mt-1.5 text-base border border-gray-300 rounded-xl px-3 py-2.5 bg-white" placeholder="Par exemple : draps pour 6 personnes" value={note} onChange={e => setNote(e.target.value)} />
+          </label>
+        </Card>
+        <button type="button" onClick={() => { requestService(owner.id, type, date, note); setSent(true); window.scrollTo({ top: 0 }) }} className="btn-primary justify-center text-base min-h-[52px] rounded-xl">Envoyer ma demande</button>
       </div>
     )
   }
@@ -236,20 +283,31 @@ function Service({ back }) {
   return (
     <div className="flex flex-col gap-5">
       <BackButton onClick={back} />
-      <Title sub="Que voulez-vous demander ?">Demander un service</Title>
-      <div className="flex flex-col gap-3">
-        {SERVICE_TYPES.map(t => <BigButton key={t.id} tone="light" icon={SERVICE_ICONS[t.id]} title={t.label} sub={t.hint} onClick={() => setType(t.id)} />)}
+      <div>
+        <h1 className="font-display text-2xl font-bold text-gray-900">Demander un service</h1>
+        <p className="text-base text-gray-600 mt-1">Que souhaitez-vous ?</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {SERVICE_TYPES.map(t => {
+          const Icon = SERVICE_ICONS[t.id]
+          return (
+            <button key={t.id} type="button" onClick={() => setType(t.id)} className="flex flex-col items-start gap-3 p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:border-navy-200 text-left min-h-[120px]">
+              <span className="w-11 h-11 rounded-xl bg-navy-50 flex items-center justify-center"><Icon size={22} className="text-navy-600" /></span>
+              <span><span className="block text-base font-semibold text-gray-900">{t.label}</span><span className="block text-sm text-gray-500 mt-0.5">{t.hint}</span></span>
+            </button>
+          )
+        })}
       </div>
       {mine.length > 0 && (
-        <div className="rounded-2xl bg-white border border-gray-200 p-5 flex flex-col gap-3">
-          <p className="text-lg font-semibold text-gray-900">Mes demandes</p>
+        <Card className="p-5 flex flex-col gap-3">
+          <p className="text-base font-semibold text-gray-900">Mes demandes</p>
           {mine.map(s => (
             <div key={s.id} className="border-t border-gray-100 pt-3 first:border-0 first:pt-0">
-              <p className="text-lg text-gray-900">{serviceLabel(s.type)}{s.date && <span className="text-gray-600"> · {longDate(s.date)}</span>}</p>
-              <p className={`text-base font-medium ${s.status === 'faite' ? 'text-teal-700' : s.status === 'refusee' ? 'text-danger-600' : 'text-amber-700'}`}>{SERVICE_STATUS[s.status]}</p>
+              <p className="text-base text-gray-900">{serviceLabel(s.type)}{s.date && <span className="text-gray-500"> · {longDate(s.date)}</span>}</p>
+              <p className={`text-sm font-medium ${s.status === 'faite' ? 'text-teal-700' : s.status === 'refusee' ? 'text-danger-600' : 'text-amber-600'}`}>{SERVICE_STATUS[s.status]}</p>
             </div>
           ))}
-        </div>
+        </Card>
       )}
     </div>
   )
@@ -266,22 +324,24 @@ function Messages({ back }) {
   return (
     <div className="flex flex-col gap-5">
       <BackButton onClick={back} />
-      <Title>Écrire à Midi Nautisme</Title>
-      <div ref={listRef} className="flex flex-col gap-3 max-h-[55vh] overflow-y-auto rounded-2xl bg-white border border-gray-200 p-4">
-        {messages.map(m => {
-          const mine = m.from === 'owner'
-          return (
-            <div key={m.id} className={`max-w-[88%] px-4 py-3 rounded-2xl ${mine ? 'self-end bg-navy-600 text-white' : 'self-start bg-gray-100 text-gray-900'}`}>
-              <p className="text-lg leading-snug">{m.text}</p>
-              <p className={`text-sm mt-1 ${mine ? 'text-navy-50' : 'text-gray-500'}`}>{mine ? 'Vous' : 'Midi Nautisme'} · {m.date}</p>
-            </div>
-          )
-        })}
-      </div>
+      <h1 className="font-display text-2xl font-bold text-gray-900">Midi Nautisme</h1>
+      <Card className="p-4">
+        <div ref={listRef} className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto">
+          {messages.map(m => {
+            const mine = m.from === 'owner'
+            return (
+              <div key={m.id} className={`max-w-[85%] px-4 py-3 rounded-2xl ${mine ? 'self-end bg-navy-600 text-white rounded-br-md' : 'self-start bg-gray-100 text-gray-900 rounded-bl-md'}`}>
+                <p className="text-base leading-snug">{m.text}</p>
+                <p className={`text-xs mt-1 ${mine ? 'text-navy-50' : 'text-gray-500'}`}>{mine ? 'Vous' : 'Midi Nautisme'} · {m.date}</p>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <label className="text-lg text-gray-700" htmlFor="owner-msg">Votre message</label>
-        <textarea id="owner-msg" rows={3} className="w-full text-lg border border-gray-300 rounded-xl px-3 py-2 bg-white" value={text} onChange={e => setText(e.target.value)} />
-        <button type="submit" disabled={!text.trim()} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl disabled:opacity-40">Envoyer</button>
+        <label className="text-base font-medium text-gray-800" htmlFor="owner-msg">Votre message</label>
+        <textarea id="owner-msg" rows={3} className="w-full text-base border border-gray-300 rounded-xl px-3 py-2.5 bg-white" value={text} onChange={e => setText(e.target.value)} />
+        <button type="submit" disabled={!text.trim()} className="btn-primary justify-center text-base min-h-[52px] rounded-xl disabled:opacity-40">Envoyer</button>
       </form>
     </div>
   )
@@ -292,42 +352,44 @@ function Suivi({ back }) {
   return (
     <div className="flex flex-col gap-5">
       <BackButton onClick={back} />
-      <Title sub="Les dernières interventions sur votre bateau.">Suivi de mon bateau</Title>
-      <ul className="flex flex-col gap-2">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-gray-900">Suivi du bateau</h1>
+        <p className="text-base text-gray-600 mt-1">Les dernières interventions.</p>
+      </div>
+      <Card className="divide-y divide-gray-100">
         {items.map(m => (
-          <li key={m.key} className="rounded-2xl bg-white border border-gray-200 p-4 flex items-center gap-4">
-            <span className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${m.done ? 'bg-teal-400' : 'bg-gray-200'}`}>{m.done && <Check size={22} className="text-white" strokeWidth={3} />}</span>
+          <div key={m.key} className="p-4 flex items-center gap-4">
+            <span className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${m.done ? 'bg-teal-50' : 'bg-gray-100'}`}>{m.done && <Check size={18} className="text-teal-600" strokeWidth={3} />}</span>
             <div>
-              <p className="text-lg text-gray-900">{m.label}</p>
-              <p className="text-base text-gray-500 first-letter:uppercase">{longDate(m.date)} · {m.by}</p>
+              <p className="text-base text-gray-900">{m.label}</p>
+              <p className="text-sm text-gray-500 first-letter:uppercase">{longDate(m.date)} · {m.by}</p>
             </div>
-          </li>
+          </div>
         ))}
-        {items.length === 0 && <p className="text-lg text-gray-500">Rien pour l'instant.</p>}
-      </ul>
+        {items.length === 0 && <p className="p-4 text-base text-gray-500">Rien pour l'instant.</p>}
+      </Card>
     </div>
   )
 }
 
 function Revenus({ back }) {
   const r = getRevenue(owner, '2026')
-  const Line = ({ label, value, strong }) => (
-    <div className="flex items-baseline justify-between gap-4 py-3 border-t border-gray-100 first:border-0">
-      <span className="text-lg text-gray-700">{label}</span>
-      <span className={`text-xl ${strong ? 'font-bold text-gray-900' : 'text-gray-900'}`}>{value}</span>
-    </div>
-  )
   return (
     <div className="flex flex-col gap-5">
       <BackButton onClick={back} />
-      <Title sub="Pour l'année 2026.">Mes revenus</Title>
-      <div className="rounded-2xl bg-white border border-gray-200 px-5 py-2">
-        <Line label="Nombre de locations" value={r.count} />
-        <Line label="Déjà gagné" value={eur(r.ownerPast)} />
-        <Line label="À venir (déjà réservé)" value={eur(r.ownerUpcoming)} />
-        <Line label="Total de l'année pour vous" value={eur(r.ownerTotal)} strong />
+      <div>
+        <h1 className="font-display text-2xl font-bold text-gray-900">Mes revenus</h1>
+        <p className="text-base text-gray-600 mt-1">Saison 2026 · {r.count} locations</p>
       </div>
-      <p className="text-base text-gray-500">Votre part est de {Math.round(r.share * 100)} % du prix des locations, selon votre contrat avec Midi Nautisme. (Démo : montants fictifs.)</p>
+      <Card className="p-6">
+        <p className="text-sm text-gray-500">Total de l'année pour vous</p>
+        <p className="font-display text-4xl font-bold text-gray-900 mt-1">{eur(r.ownerTotal)}</p>
+        <div className="grid grid-cols-2 gap-4 mt-5 pt-5 border-t border-gray-100">
+          <div><p className="text-sm text-gray-500">Déjà gagné</p><p className="text-xl font-semibold text-gray-900">{eur(r.ownerPast)}</p></div>
+          <div><p className="text-sm text-gray-500">À venir</p><p className="text-xl font-semibold text-gray-900">{eur(r.ownerUpcoming)}</p></div>
+        </div>
+      </Card>
+      <p className="text-sm text-gray-500">Votre part : {Math.round(r.share * 100)} % du prix des locations, selon votre contrat avec Midi Nautisme. (Démo : montants fictifs.)</p>
     </div>
   )
 }
@@ -335,25 +397,26 @@ function Revenus({ back }) {
 export default function ProprietaireDashboard({ onLogout }) {
   const [screen, setScreen] = useState('home')
   const [, refresh] = useState(0)
-  useEffect(() => subscribeOwner(() => refresh(v => v + 1)), [])
+  useEffect(() => subscribeOwner(() => refresh(v => v + 1)), []) // ce que fait l'agence s'affiche tout de suite
   const go = s => { setScreen(s); window.scrollTo({ top: 0 }) }
   const back = () => go('home')
   const vis = getVisibility(owner.id)
-  getOwnerState() // abonné : chaque changement (par l'agence ou par lui) redessine l'écran
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="bg-navy-900">
-        <div className="max-w-xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button type="button" onClick={back} className="font-display text-white text-xl font-bold tracking-tight">Hel<span className="text-teal-200">mo</span></button>
-          <span className="text-sm text-navy-100">Mon bateau</span>
-          <button type="button" onClick={onLogout} className="ml-auto flex items-center gap-2 min-h-[44px] px-3 rounded-lg text-base text-white hover:bg-navy-800"><LogOut size={18} /> Quitter</button>
+    <div className="min-h-screen bg-[#F6F7F9] text-gray-900">
+      <header className="bg-white border-b border-gray-100">
+        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center gap-3">
+          <button type="button" onClick={back} className="font-display text-xl font-bold tracking-tight text-navy-900">Hel<span className="text-teal-400">mo</span></button>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="hidden sm:block text-sm text-gray-600">{owner.name}</span>
+            <span className="w-9 h-9 rounded-full bg-navy-50 text-navy-800 text-sm font-bold flex items-center justify-center">{owner.initials}</span>
+            <button type="button" onClick={onLogout} className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-sm text-gray-600 hover:bg-gray-100"><LogOut size={16} /> Quitter</button>
+          </div>
         </div>
       </header>
-      <p className="max-w-xl mx-auto px-4 pt-3 text-sm text-gray-500">Démo : propriétaire et données fictives.</p>
-      <main className="max-w-xl mx-auto px-4 pt-3 pb-10">
+      <main className="max-w-2xl mx-auto px-4 pt-5 pb-12">
+        <p className="text-xs text-gray-400 mb-3">Démo : propriétaire et données fictives.</p>
         {screen === 'home' && <Home go={go} />}
-        {screen === 'reserver' && <Reserver back={back} />}
         {screen === 'service' && <Service back={back} />}
         {screen === 'messages' && <Messages back={back} />}
         {screen === 'suivi' && (vis.suivi ? <Suivi back={back} /> : <Home go={go} />)}
