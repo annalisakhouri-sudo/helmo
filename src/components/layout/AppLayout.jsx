@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Users, Wrench, Sparkles,
-  Anchor, UserCircle, MessageCircle, LogOut, Tag, Receipt
+  Anchor, UserCircle, MessageCircle, LogOut, Tag, Receipt, KeyRound
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { BRANDS } from '@/lib/mock-data'
 import GlobalSearch from './GlobalSearch'
 import { getUrgentClientAlerts, subscribeClients } from '@/lib/client-alerts'
 import { getTotalUnread, subscribeMessages } from '@/lib/messaging'
+import { getAgencyOwnerAlerts, subscribeOwner } from '@/lib/owner-space'
 
 const NAV = [
   {
@@ -29,6 +30,13 @@ const NAV = [
       { to: '/menage', label: 'Ménage', icon: Sparkles },
     ],
   },
+  // Gestion locative : bateaux confiés par leurs propriétaires (démo, à tester avec Marie).
+  {
+    section: 'Gestion locative',
+    items: [
+      { to: '/proprietaires', label: 'Propriétaires', icon: KeyRound, badge: 'owners' },
+    ],
+  },
   // Réglés une fois en début de saison : rangés en bas pour ne pas encombrer.
   {
     section: 'Réglages',
@@ -45,7 +53,13 @@ export default function AppLayout({ user, onLogout }) {
   const [, refresh] = useState(0)
   useEffect(() => subscribeClients(() => refresh(v => v + 1)), [])
   useEffect(() => subscribeMessages(() => refresh(v => v + 1)), [])
-  const badges = { clientAlerts: getUrgentClientAlerts().length, messages: getTotalUnread('agency') }
+  useEffect(() => subscribeOwner(() => refresh(v => v + 1)), [])
+  const badges = {
+    clientAlerts: getUrgentClientAlerts().length,
+    messages: getTotalUnread('agency'),
+    // Demandes de services en attente + messages non lus des propriétaires de la marque.
+    owners: getAgencyOwnerAlerts(activeBrand).reduce((n, a) => n + a.total, 0),
+  }
 
   return (
     <div className="flex h-screen h-dvh overflow-hidden bg-gray-50">

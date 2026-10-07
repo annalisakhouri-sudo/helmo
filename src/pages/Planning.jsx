@@ -1,10 +1,11 @@
 import { addBooking } from '@/lib/bookings'
 import { useState, useEffect } from 'react'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Wrench, Check, Sparkles, KeyRound } from 'lucide-react'
 import { addDays, addMonths, format, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, getDay, endOfWeek } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BOATS, BOOKINGS, TECHNICIANS, CLIENTS } from '@/lib/mock-data'
+import { getAllBlocks, subscribeOwner } from '@/lib/owner-space'
 import BookingDetail from '@/components/planning/BookingDetail'
 import NewBookingModal from '@/components/planning/NewBookingModal'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
@@ -51,6 +52,7 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
   const N = days.length // 8 (samedi → samedi inclus)
   const [, forceUpdate] = useState(0)
   useEffect(() => subscribe(() => forceUpdate(v => v + 1)), [])
+  useEffect(() => subscribeOwner(() => forceUpdate(v => v + 1)), [])
   const dayIndex = (dateStr) => days.findIndex(d => format(d, 'yyyy-MM-dd') === dateStr)
   const firstDayStr = format(days[0], 'yyyy-MM-dd')
   const lastDayStr = format(days[days.length - 1], 'yyyy-MM-dd')
@@ -144,6 +146,8 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
         const bks = bookings.filter(b => b.boatId === boat.id && isVisibleInView(b))
         const allBoatBookings = bookings.filter(b => b.boatId === boat.id)
         const maintenanceBlocks = getMaintenanceBlocks(allBoatBookings)
+        // Dates gardées par le propriétaire (gestion locative) : le bateau n'est pas à louer.
+        const ownerBlocks = getAllBlocks().filter(o => o.boatId === boat.id && o.start <= lastDayStr && (o.start === o.end ? o.end >= firstDayStr : o.end > firstDayStr))
         return (
           <div key={boat.id} className="grid border-t border-gray-100" style={{ gridTemplateColumns: `100px repeat(${N},1fr)`, minHeight: 72 }}>
             <div className="bg-gray-50 border-r border-gray-100 px-3 py-2 flex flex-col justify-center">
@@ -176,6 +180,17 @@ function WeekView({ days, boats, bookings, onSelect, onSelectGap, highlightId })
                         )
                       })()}
                     </div>
+                  </div>
+                )
+              })}
+
+              {ownerBlocks.map(o => {
+                const si = o.start < firstDayStr ? 0 : dayIndex(o.start)
+                const ei = o.start === o.end ? si + 1 : (o.end > lastDayStr ? N : dayIndex(o.end))
+                return (
+                  <div key={o.id} className="absolute top-2 bottom-2 rounded-lg px-2.5 py-1.5 border border-amber-200 text-amber-900 overflow-hidden" style={{ left: `${(si / N) * 100}%`, width: `${(Math.max(ei - si, 0.5) / N) * 100}%`, zIndex: 2, background: 'repeating-linear-gradient(135deg, #FAEEDA 0 8px, #FFF7EA 8px 16px)' }} title="Dates gardées par le propriétaire : bateau non disponible à la location">
+                    <p className="text-xs font-semibold truncate flex items-center gap-1"><KeyRound size={11} /> Propriétaire</p>
+                    <p className="text-[10px] truncate">{o.label}</p>
                   </div>
                 )
               })}
@@ -406,7 +421,7 @@ export default function Planning() {
       <div className="flex-1 overflow-auto p-5">
         {/* Légende */}
         <div className="flex gap-4 mb-3 flex-wrap">
-          {[{dot:'bg-teal-400',label:'Complet'},{dot:'bg-amber-300',label:'Skipper manquant'},{dot:'bg-danger-400',label:'Problème doc'}].map(({dot,label}) => (
+          {[{dot:'bg-teal-400',label:'Complet'},{dot:'bg-amber-300',label:'Skipper manquant'},{dot:'bg-danger-400',label:'Problème doc'},{dot:'bg-amber-100 border border-amber-300',label:'Propriétaire (vue semaine)'}].map(({dot,label}) => (
             <div key={label} className="flex items-center gap-1.5 text-xs text-gray-400">
               <div className={`w-2.5 h-2.5 rounded-full ${dot}`} />{label}
             </div>

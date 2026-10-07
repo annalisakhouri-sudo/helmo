@@ -1,358 +1,363 @@
-// Espace propriétaire — écran de DÉMO (décision du 07/10/2026), pour tester l'idée avec Marie.
-// Deux vues dans le même écran, pour la démo uniquement :
-// - « Vue propriétaire » : ce que voit le propriétaire du bateau ;
-// - « Réglages du loueur » : ce que l'agence choisit de lui montrer, et ses demandes à traiter.
-// En production, les réglages du loueur iront dans la fiche bateau côté agence.
-// Toute la logique est dans src/lib/owner-space.js.
+// Espace propriétaire — DÉMO (décision du 07/10/2026), à tester avec Marie.
+// Pour le propriétaire du bateau, souvent une personne âgée : tout doit être évident.
+// Principes : une seule action par écran, gros boutons avec un texte (jamais une icône seule),
+// des phrases complètes, une confirmation avant chaque engagement, un bouton « Retour » partout.
+// Il voit tout sur SON bateau, sauf les locataires (il sait seulement que le bateau est loué).
+// L'agence traite ses demandes dans son onglet « Propriétaires » (src/pages/GestionLocative.jsx).
+// Logique : src/lib/owner-space.js.
 import { useState, useEffect, useRef } from 'react'
-import { LogOut, Calendar, Wrench, Euro, ClipboardCheck, MessageCircle, Lock, Send, Check, X, Eye, EyeOff, Info, Anchor, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, Wrench, MessageCircle, ClipboardCheck, Euro, ArrowLeft, Check, Sparkles, Anchor, Hammer, Ship, LogOut, ChevronRight } from 'lucide-react'
 import {
-  DEMO_OWNER, SERVICE_TYPES, VISIBILITY_ITEMS, TODAY,
-  getOwnerState, subscribeOwner, setVisibility, getOwnerBoat, getBoatRentals,
-  addBlock, removeBlock, getRevenue, getBoatMissions, requestService, setServiceStatus, sendOwnerMessage,
+  DEMO_OWNER, SERVICE_TYPES, SERVICE_STATUS, TODAY, serviceLabel,
+  subscribeOwner, getOwnerState, getVisibility, getOwnerBoat, getBoatStatusToday, getUpcomingWeeks,
+  getOwnerBlocks, addBlock, removeBlock, getRevenue, getBoatHistory, getOwnerServices, requestService,
+  getOwnerMessages, sendOwnerMessage, getUnread, markRead,
 } from '@/lib/owner-space'
-import { fmtDate, fmtRange } from '@/lib/dates'
 
+const owner = DEMO_OWNER
 const eur = n => n.toLocaleString('fr-FR') + ' €'
-const addDays = (s, n) => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
-const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
-const STATUS = {
-  envoyee: { label: 'Envoyée', cls: 'pill-blue' },
-  acceptee: { label: 'Acceptée', cls: 'pill-warn' },
-  faite: { label: 'Faite', cls: 'pill-ok' },
-  refusee: { label: 'Refusée', cls: 'pill-danger' },
-}
-const serviceLabel = id => SERVICE_TYPES.find(t => t.id === id)?.label || id
+// Dates écrites en toutes lettres : « samedi 11 juillet ».
+const longDate = (s, withYear = false) => new Date(s + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}) })
+const SERVICE_ICONS = { preparation: Anchor, menage: Sparkles, entretien: Wrench, sav: Hammer }
 
-function Section({ icon: Icon, title, children, aside }) {
+function BackButton({ onClick }) {
   return (
-    <section className="card flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Icon size={15} className="text-navy-600" />
-        <h2 className="font-display text-sm font-bold text-gray-900">{title}</h2>
-        {aside && <div className="ml-auto">{aside}</div>}
-      </div>
-      {children}
-    </section>
+    <button type="button" onClick={onClick} className="self-start flex items-center gap-2 min-h-[48px] px-4 rounded-xl bg-white border border-gray-200 text-base font-medium text-gray-700 hover:bg-gray-50">
+      <ArrowLeft size={20} /> Retour
+    </button>
   )
 }
 
-// ── Planning : bande des 26 prochaines semaines + liste + blocage de dates ──
-function PlanningSection({ st, showAmounts }) {
-  const rentals = getBoatRentals()
-  const [form, setForm] = useState({ start: '', end: '', label: '' })
+function BigButton({ icon: Icon, title, sub, onClick, badge, tone = 'primary' }) {
+  const primary = tone === 'primary'
+  return (
+    <button type="button" onClick={onClick} className={`w-full flex items-center gap-4 p-5 rounded-2xl text-left transition-colors ${primary ? 'bg-navy-600 hover:bg-navy-800 text-white' : 'bg-white hover:bg-gray-50 border border-gray-200 text-gray-900'}`}>
+      <span className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${primary ? 'bg-white/15' : 'bg-navy-50'}`}>
+        <Icon size={28} className={primary ? 'text-white' : 'text-navy-600'} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-xl font-semibold leading-tight">{title}</span>
+        {sub && <span className={`block text-base mt-1 ${primary ? 'text-navy-50' : 'text-gray-500'}`}>{sub}</span>}
+      </span>
+      {badge && <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-sm font-semibold flex-shrink-0">{badge}</span>}
+      <ChevronRight size={26} className={`flex-shrink-0 ${primary ? 'text-white/70' : 'text-gray-400'}`} />
+    </button>
+  )
+}
+
+function Title({ children, sub }) {
+  return (
+    <div>
+      <h1 className="font-display text-2xl font-bold text-gray-900">{children}</h1>
+      {sub && <p className="text-lg text-gray-600 mt-1">{sub}</p>}
+    </div>
+  )
+}
+
+// ── Accueil ──
+function Home({ go }) {
+  const boat = getOwnerBoat()
+  const vis = getVisibility(owner.id)
+  const status = getBoatStatusToday()
+  const unread = getUnread('owner', owner.id)
+  const myDates = getOwnerBlocks(owner.id).filter(b => b.end >= TODAY)
+  const myRequests = getOwnerServices(owner.id).filter(s => s.status === 'envoyee' || s.status === 'acceptee')
+  const statusText = status.kind === 'mine'
+    ? `Votre bateau est à vous jusqu'au ${longDate(status.until)}.`
+    : status.kind === 'loue'
+      ? `Votre bateau est ${vis.locations ? 'loué' : 'occupé'} jusqu'au ${longDate(status.until)}.`
+      : 'Votre bateau est au port.'
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Title>Bonjour {owner.firstName}</Title>
+
+      <div className="rounded-2xl bg-white border border-gray-200 p-5 flex items-center gap-4">
+        <span className="w-14 h-14 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0"><Ship size={28} className="text-teal-600" /></span>
+        <div className="min-w-0">
+          <p className="text-xl font-semibold text-gray-900">{boat.name}</p>
+          <p className="text-lg text-gray-700 mt-0.5">{statusText}</p>
+          <p className="text-base text-gray-500 mt-0.5">Géré par Midi Nautisme · {boat.port}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <BigButton icon={CalendarDays} title="Réserver mon bateau" sub="Choisir des dates pour naviguer" onClick={() => go('reserver')} />
+        <BigButton icon={Wrench} title="Demander un service" sub="Préparation, ménage, entretien, réparation" onClick={() => go('service')} />
+        <BigButton icon={MessageCircle} title="Écrire à l'agence" sub="Poser une question à Midi Nautisme" onClick={() => go('messages')} badge={unread ? `${unread} nouveau${unread > 1 ? 'x' : ''}` : null} />
+      </div>
+
+      {(vis.suivi || vis.revenus) && (
+        <div className="flex flex-col gap-3">
+          {vis.suivi && <BigButton tone="light" icon={ClipboardCheck} title="Suivi de mon bateau" sub="Ce qui a été fait dessus" onClick={() => go('suivi')} />}
+          {vis.revenus && <BigButton tone="light" icon={Euro} title="Mes revenus" sub="Ce que rapportent les locations" onClick={() => go('revenus')} />}
+        </div>
+      )}
+
+      {(myDates.length > 0 || myRequests.length > 0) && (
+        <div className="rounded-2xl bg-white border border-gray-200 p-5 flex flex-col gap-3">
+          <p className="text-lg font-semibold text-gray-900">En ce moment</p>
+          {myDates.map(b => (
+            <p key={b.id} className="text-base text-gray-700 flex gap-2"><CalendarDays size={20} className="text-teal-600 flex-shrink-0 mt-0.5" />Bateau réservé pour vous du {longDate(b.start)} au {longDate(b.end)}.</p>
+          ))}
+          {myRequests.map(s => (
+            <p key={s.id} className="text-base text-gray-700 flex gap-2"><Wrench size={20} className="text-navy-600 flex-shrink-0 mt-0.5" />{serviceLabel(s.type)} : {SERVICE_STATUS[s.status].toLowerCase()}.</p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Réserver mon bateau ──
+function Reserver({ back }) {
+  const vis = getVisibility(owner.id)
+  const weeks = getUpcomingWeeks(owner, 16)
+  const [confirm, setConfirm] = useState(null) // { action: 'add' | 'remove', start, end, blockId }
+  const [done, setDone] = useState(null)
+  const [custom, setCustom] = useState(false)
+  const [form, setForm] = useState({ start: '', end: '' })
   const [error, setError] = useState('')
-  const weeks = Array.from({ length: 26 }, (_, i) => {
-    const start = addDays(TODAY, i * 7)
-    const p = { start, end: addDays(start, 7) }
-    const hit = list => list.some(x => x.start < p.end && p.start < (x.start === x.end ? addDays(x.end, 1) : x.end))
-    return { start, state: hit(st.blocks) ? 'bloque' : hit(rentals) ? 'loue' : 'libre' }
-  })
-  // Les dates bloquées du propriétaire sont toujours listées ; seulement les 4 prochaines
-  // locations (sinon l'été les noie).
-  const upcoming = [
-    ...rentals.filter(r => r.end > TODAY).slice(0, 4).map(r => ({ ...r, kind: 'loue' })),
-    ...st.blocks.filter(b => b.end >= TODAY).map(b => ({ ...b, kind: 'bloque' })),
-  ].sort((a, b) => a.start.localeCompare(b.start))
 
-  function submit(e) {
-    e.preventDefault()
-    const res = addBlock(form.start, form.end, form.label)
-    if (!res.ok) { setError(res.error); return }
-    setForm({ start: '', end: '', label: '' }); setError('')
+  function validate() {
+    if (confirm.action === 'remove') { removeBlock(confirm.blockId); setDone('Votre réservation est annulée. Le bateau peut de nouveau être loué ces jours-là.') }
+    else {
+      const res = addBlock(owner.id, confirm.start, confirm.end)
+      if (!res.ok) { setError(res.error); setConfirm(null); return }
+      setDone(`C'est noté : votre bateau est à vous du ${longDate(confirm.start)} au ${longDate(confirm.end)}. L'agence est prévenue.`)
+    }
+    setConfirm(null); setError('')
+    window.scrollTo({ top: 0 })
   }
 
+  if (done) return (
+    <div className="flex flex-col gap-5">
+      <div className="rounded-2xl bg-teal-50 border border-teal-100 p-6 flex flex-col items-center text-center gap-3">
+        <span className="w-16 h-16 rounded-full bg-teal-400 flex items-center justify-center"><Check size={34} className="text-white" strokeWidth={3} /></span>
+        <p className="text-xl text-teal-900 font-semibold">{done}</p>
+      </div>
+      <button type="button" onClick={back} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl">Revenir à l'accueil</button>
+    </div>
+  )
+
+  if (confirm) return (
+    <div className="flex flex-col gap-5">
+      <Title>{confirm.action === 'add' ? 'Vous confirmez ?' : 'Annuler cette réservation ?'}</Title>
+      <div className="rounded-2xl bg-white border border-gray-200 p-6">
+        <p className="text-xl text-gray-900">
+          {confirm.action === 'add'
+            ? <>Vous gardez votre bateau du <strong>{longDate(confirm.start)}</strong> au <strong>{longDate(confirm.end)}</strong>.</>
+            : <>Votre bateau pourra de nouveau être loué du <strong>{longDate(confirm.start)}</strong> au <strong>{longDate(confirm.end)}</strong>.</>}
+        </p>
+        {confirm.action === 'add' && <p className="text-lg text-gray-600 mt-2">Il ne sera pas loué ces jours-là.</p>}
+      </div>
+      <button type="button" onClick={validate} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl"><Check size={22} /> {confirm.action === 'add' ? 'Oui, je réserve' : 'Oui, j\'annule'}</button>
+      <button type="button" onClick={() => setConfirm(null)} className="btn-ghost justify-center text-lg min-h-[56px] rounded-xl text-gray-700">Non, revenir</button>
+    </div>
+  )
+
   return (
-    <Section icon={Calendar} title="Planning du bateau">
-      <div>
-        <div className="flex gap-0.5" role="img" aria-label="26 prochaines semaines : louées, bloquées par vous, libres">
-          {weeks.map(w => (
-            <div key={w.start} title={`Semaine du ${fmtDate(w.start)}`} className={`flex-1 h-7 rounded-sm ${w.state === 'loue' ? 'bg-navy-600' : w.state === 'bloque' ? 'bg-amber-200' : 'bg-gray-100'}`} />
-          ))}
-        </div>
-        <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-          <span>{fmtDate(weeks[0].start)}</span><span>{fmtDate(weeks[25].start)}</span>
-        </div>
-        <div className="flex flex-wrap gap-3 text-[11px] text-gray-500 mt-2">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-navy-600" />Loué</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-200" />Bloqué par vous</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200" />Libre</span>
-        </div>
-      </div>
+    <div className="flex flex-col gap-5">
+      <BackButton onClick={back} />
+      <Title sub="Touchez « Réserver » sur une semaine libre.">Réserver mon bateau</Title>
+      {error && <p className="rounded-xl bg-danger-50 text-danger-800 text-lg p-4">{error}</p>}
 
-      <div className="flex flex-col gap-1.5">
-        {upcoming.map(x => (
-          <div key={x.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${x.kind === 'bloque' ? 'bg-amber-50' : 'bg-gray-50'}`}>
-            {x.kind === 'bloque' ? <Lock size={13} className="text-amber-600 flex-shrink-0" /> : <Anchor size={13} className="text-navy-600 flex-shrink-0" />}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800">{fmtRange(x.start, x.end)}</p>
-              <p className="text-[11px] text-gray-500">{x.kind === 'bloque' ? x.label : 'Location'}</p>
+      <ul className="flex flex-col gap-2">
+        {weeks.map(w => (
+          <li key={w.start} className={`rounded-2xl border p-4 flex flex-wrap items-center gap-3 ${w.state === 'mine' ? 'bg-teal-50 border-teal-100' : w.state === 'loue' ? 'bg-gray-100 border-gray-100' : 'bg-white border-gray-200'}`}>
+            <div className="flex-1 min-w-[200px]">
+              <p className="text-lg font-medium text-gray-900 first-letter:uppercase">{longDate(w.start)}</p>
+              <p className="text-base text-gray-600">au {longDate(w.end)}</p>
             </div>
-            {x.kind === 'loue' && showAmounts && <span className="text-xs font-medium text-gray-700">{eur(x.amount)}</span>}
-            {x.kind === 'bloque' && x.start >= TODAY && (
-              <button type="button" className="p-1.5 rounded hover:bg-amber-100 text-amber-700" onClick={() => removeBlock(x.id)} aria-label="Libérer ces dates"><Trash2 size={13} /></button>
-            )}
-          </div>
+            {w.state === 'libre' && <button type="button" onClick={() => setConfirm({ action: 'add', start: w.start, end: w.end })} className="btn-primary text-lg min-h-[52px] px-6 rounded-xl">Réserver</button>}
+            {w.state === 'loue' && <span className="text-lg text-gray-500 px-2">{vis.locations ? 'Loué' : 'Indisponible'}</span>}
+            {w.state === 'mine' && <>
+              <span className="text-lg font-semibold text-teal-800 flex items-center gap-1.5"><Check size={20} /> Pour vous</span>
+              <button type="button" onClick={() => { const b = getOwnerBlocks(owner.id).find(x => x.id === w.blockId); setConfirm({ action: 'remove', blockId: w.blockId, start: b.start, end: b.end }) }} className="btn-ghost text-base min-h-[48px] rounded-xl text-gray-700">Annuler</button>
+            </>}
+          </li>
         ))}
-      </div>
+      </ul>
 
-      <form onSubmit={submit} className="flex flex-col gap-2 border-t border-gray-100 pt-3">
-        <p className="text-xs font-medium text-gray-700">Bloquer des dates pour naviguer</p>
-        <div className="flex flex-wrap gap-2">
-          <label className="flex-1 min-w-[130px] text-[11px] text-gray-500">Du
-            <input type="date" className="w-full mt-0.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} />
-          </label>
-          <label className="flex-1 min-w-[130px] text-[11px] text-gray-500">Au
-            <input type="date" className="w-full mt-0.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} />
-          </label>
-          <label className="flex-[2] min-w-[160px] text-[11px] text-gray-500">Note (facultatif)
-            <input type="text" placeholder="Ex : vacances en famille" className="w-full mt-0.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5" value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} />
-          </label>
-        </div>
-        {error && <p className="text-xs text-danger-600">{error}</p>}
-        <button type="submit" className="btn-primary text-xs self-start"><Lock size={12} /> Bloquer ces dates</button>
-        <p className="text-[10px] text-gray-400">Le loueur voit ces dates : le bateau n'est plus proposé à la location.</p>
-      </form>
-    </Section>
+      <div className="rounded-2xl bg-white border border-gray-200 p-5 flex flex-col gap-4">
+        {!custom
+          ? <button type="button" onClick={() => setCustom(true)} className="text-lg text-navy-600 font-medium text-left min-h-[48px]">Seulement quelques jours ? Choisir d'autres dates</button>
+          : <>
+            <p className="text-lg font-semibold text-gray-900">Choisir mes dates</p>
+            <label className="text-lg text-gray-700">Je pars le
+              <input type="date" min={TODAY} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 min-h-[52px]" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} />
+            </label>
+            <label className="text-lg text-gray-700">Je rends le bateau le
+              <input type="date" min={form.start || TODAY} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 min-h-[52px]" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} />
+            </label>
+            <button type="button" disabled={!form.start || !form.end} onClick={() => setConfirm({ action: 'add', start: form.start, end: form.end })} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl disabled:opacity-40">Continuer</button>
+          </>}
+      </div>
+    </div>
   )
 }
 
-function ServicesSection({ st }) {
-  const [form, setForm] = useState({ type: 'preparation', date: '', note: '' })
+// ── Demander un service : 1) quoi, 2) quand et précisions, 3) c'est envoyé ──
+function Service({ back }) {
+  const [type, setType] = useState(null)
+  const [date, setDate] = useState('')
+  const [note, setNote] = useState('')
   const [sent, setSent] = useState(false)
-  function submit(e) {
-    e.preventDefault()
-    requestService(form.type, form.date, form.note)
-    setForm({ type: 'preparation', date: '', note: '' }); setSent(true)
-    setTimeout(() => setSent(false), 3000)
-  }
-  return (
-    <Section icon={Wrench} title="Demander un service au loueur">
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <label className="flex-[2] min-w-[180px] text-[11px] text-gray-500">Service
-            <select className="w-full mt-0.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-              {SERVICE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-          </label>
-          <label className="flex-1 min-w-[130px] text-[11px] text-gray-500">Pour le
-            <input type="date" className="w-full mt-0.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-          </label>
-        </div>
-        <label className="text-[11px] text-gray-500">Précisions
-          <textarea rows={2} placeholder="Ex : pleins faits, draps pour 6 personnes" className="w-full mt-0.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
-        </label>
-        <div className="flex items-center gap-3">
-          <button type="submit" className="btn-primary text-xs"><Send size={12} /> Envoyer la demande</button>
-          {sent && <span className="text-xs text-teal-700 flex items-center gap-1"><Check size={12} /> Demande envoyée au loueur</span>}
-        </div>
-      </form>
-      <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-3">
-        {st.services.map(s => (
-          <div key={s.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800">{serviceLabel(s.type)}{s.date && <span className="font-normal text-gray-500"> · {fmtDate(s.date, true)}</span>}</p>
-              {s.note && <p className="text-[11px] text-gray-500 truncate">{s.note}</p>}
-            </div>
-            <span className={STATUS[s.status].cls}>{STATUS[s.status].label}</span>
-          </div>
-        ))}
-      </div>
-    </Section>
-  )
-}
+  const mine = getOwnerServices(owner.id)
 
-function RevenueSection() {
-  const r = getRevenue('2026')
-  const max = Math.max(...r.byMonth, 1)
-  return (
-    <Section icon={Euro} title="Revenus de location · 2026">
-      <div className="flex flex-wrap gap-3">
-        {[
-          ['Locations', r.weeks],
-          ['Déjà encaissé', eur(r.past)],
-          ['Réservé à venir', eur(r.upcoming)],
-          [`Votre part (${Math.round(DEMO_OWNER.ownerShare * 100)} %)`, eur(r.ownerPart)],
-        ].map(([l, v]) => (
-          <div key={l} className="basis-[calc(50%-6px)] flex-grow card-sm">
-            <p className="font-display text-lg font-bold text-gray-900">{v}</p>
-            <p className="text-[11px] text-gray-500">{l}</p>
-          </div>
-        ))}
+  if (sent) return (
+    <div className="flex flex-col gap-5">
+      <div className="rounded-2xl bg-teal-50 border border-teal-100 p-6 flex flex-col items-center text-center gap-3">
+        <span className="w-16 h-16 rounded-full bg-teal-400 flex items-center justify-center"><Check size={34} className="text-white" strokeWidth={3} /></span>
+        <p className="text-xl text-teal-900 font-semibold">Votre demande est envoyée.</p>
+        <p className="text-lg text-teal-800">Midi Nautisme va vous répondre. Vous verrez la réponse sur l'accueil.</p>
       </div>
-      <div>
-        <div className="flex items-end gap-1 h-20" role="img" aria-label="Revenus de location par mois en 2026">
-          {r.byMonth.map((v, i) => (
-            <div key={i} className="flex-1 flex flex-col justify-end h-full" title={`${MONTHS[i]} : ${eur(v)}`}>
-              <div className={`rounded-t-sm ${i + 1 < 7 ? 'bg-navy-600' : 'bg-navy-100'}`} style={{ height: `${(v / max) * 100}%`, minHeight: v ? 2 : 0 }} />
+      <button type="button" onClick={back} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl">Revenir à l'accueil</button>
+    </div>
+  )
+
+  if (type) {
+    const T = SERVICE_TYPES.find(t => t.id === type)
+    return (
+      <div className="flex flex-col gap-5">
+        <BackButton onClick={() => setType(null)} />
+        <Title>{T.label}</Title>
+        <label className="text-lg text-gray-700">Pour quel jour ? <span className="text-gray-500">(si vous savez)</span>
+          <input type="date" min={TODAY} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 min-h-[52px] bg-white" value={date} onChange={e => setDate(e.target.value)} />
+        </label>
+        <label className="text-lg text-gray-700">Un détail à ajouter ? <span className="text-gray-500">(facultatif)</span>
+          <textarea rows={3} className="block w-full mt-1 text-lg border border-gray-300 rounded-xl px-3 py-2 bg-white" placeholder="Par exemple : draps pour 6 personnes" value={note} onChange={e => setNote(e.target.value)} />
+        </label>
+        <button type="button" onClick={() => { requestService(owner.id, type, date, note); setSent(true); window.scrollTo({ top: 0 }) }} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl">Envoyer ma demande</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <BackButton onClick={back} />
+      <Title sub="Que voulez-vous demander ?">Demander un service</Title>
+      <div className="flex flex-col gap-3">
+        {SERVICE_TYPES.map(t => <BigButton key={t.id} tone="light" icon={SERVICE_ICONS[t.id]} title={t.label} sub={t.hint} onClick={() => setType(t.id)} />)}
+      </div>
+      {mine.length > 0 && (
+        <div className="rounded-2xl bg-white border border-gray-200 p-5 flex flex-col gap-3">
+          <p className="text-lg font-semibold text-gray-900">Mes demandes</p>
+          {mine.map(s => (
+            <div key={s.id} className="border-t border-gray-100 pt-3 first:border-0 first:pt-0">
+              <p className="text-lg text-gray-900">{serviceLabel(s.type)}{s.date && <span className="text-gray-600"> · {longDate(s.date)}</span>}</p>
+              <p className={`text-base font-medium ${s.status === 'faite' ? 'text-teal-700' : s.status === 'refusee' ? 'text-danger-600' : 'text-amber-700'}`}>{SERVICE_STATUS[s.status]}</p>
             </div>
           ))}
         </div>
-        <div className="flex gap-1 mt-1">{MONTHS.map(m => <span key={m} className="flex-1 text-center text-[9px] text-gray-400">{m}</span>)}</div>
-      </div>
-      <p className="text-[10px] text-gray-400 flex items-start gap-1"><Info size={11} className="flex-shrink-0 mt-px" />Démo : montants calculés depuis la grille tarifaire, part propriétaire de 70 % supposée. Le vrai taux dépend du contrat de gestion.</p>
-    </Section>
+      )}
+    </div>
   )
 }
 
-function MissionsSection() {
-  const missions = getBoatMissions(8)
-  return (
-    <Section icon={ClipboardCheck} title="Missions faites sur le bateau">
-      <div className="flex flex-col gap-1.5">
-        {missions.map(m => (
-          <div key={m.key} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${m.done ? 'bg-teal-400' : 'bg-gray-200'}`}>{m.done && <Check size={11} className="text-white" />}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800">{m.label}</p>
-              <p className="text-[11px] text-gray-500">{fmtDate(m.date, true)} · {m.by}</p>
-            </div>
-          </div>
-        ))}
-        {missions.length === 0 && <p className="text-xs text-gray-400">Aucune mission pour l'instant.</p>}
-      </div>
-    </Section>
-  )
-}
-
-function MessagesSection({ st, side }) {
+// ── Écrire à l'agence ──
+function Messages({ back }) {
   const [text, setText] = useState('')
   const listRef = useRef(null)
-  // Toujours afficher le dernier message (comme une messagerie).
-  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [st.messages.length])
-  function submit(e) { e.preventDefault(); sendOwnerMessage(side, text); setText('') }
+  const messages = getOwnerMessages(owner.id)
+  useEffect(() => { markRead('owner', owner.id) }, [messages.length])
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [messages.length])
+  function submit(e) { e.preventDefault(); sendOwnerMessage(owner.id, 'owner', text); setText('') }
   return (
-    <Section icon={MessageCircle} title={side === 'owner' ? 'Messages avec Midi Nautisme' : `Messages avec ${DEMO_OWNER.name}`}>
-      <div ref={listRef} className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-        {st.messages.map(m => {
-          const mine = m.from === side
+    <div className="flex flex-col gap-5">
+      <BackButton onClick={back} />
+      <Title>Écrire à Midi Nautisme</Title>
+      <div ref={listRef} className="flex flex-col gap-3 max-h-[55vh] overflow-y-auto rounded-2xl bg-white border border-gray-200 p-4">
+        {messages.map(m => {
+          const mine = m.from === 'owner'
           return (
-            <div key={m.id} className={`max-w-[85%] px-3 py-2 rounded-xl text-xs ${mine ? 'self-end bg-navy-600 text-white' : 'self-start bg-gray-100 text-gray-800'}`}>
-              <p>{m.text}</p>
-              <p className={`text-[10px] mt-0.5 ${mine ? 'text-navy-100' : 'text-gray-400'}`}>{m.from === 'owner' ? DEMO_OWNER.name : 'Midi Nautisme'} · {m.date}</p>
+            <div key={m.id} className={`max-w-[88%] px-4 py-3 rounded-2xl ${mine ? 'self-end bg-navy-600 text-white' : 'self-start bg-gray-100 text-gray-900'}`}>
+              <p className="text-lg leading-snug">{m.text}</p>
+              <p className={`text-sm mt-1 ${mine ? 'text-navy-50' : 'text-gray-500'}`}>{mine ? 'Vous' : 'Midi Nautisme'} · {m.date}</p>
             </div>
           )
         })}
       </div>
-      <form onSubmit={submit} className="flex gap-2">
-        <label className="sr-only" htmlFor={`msg-${side}`}>Votre message</label>
-        <input id={`msg-${side}`} className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="Écrire un message…" value={text} onChange={e => setText(e.target.value)} />
-        <button type="submit" className="btn-primary text-xs" aria-label="Envoyer"><Send size={13} /></button>
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <label className="text-lg text-gray-700" htmlFor="owner-msg">Votre message</label>
+        <textarea id="owner-msg" rows={3} className="w-full text-lg border border-gray-300 rounded-xl px-3 py-2 bg-white" value={text} onChange={e => setText(e.target.value)} />
+        <button type="submit" disabled={!text.trim()} className="btn-primary justify-center text-lg min-h-[56px] rounded-xl disabled:opacity-40">Envoyer</button>
       </form>
-      {side === 'agency' && <p className="text-[10px] text-gray-400">Ce fil est partagé avec le propriétaire. Le fil interne de l'agence (techniciens, ménage, skippers) ne lui est jamais visible.</p>}
-    </Section>
+    </div>
   )
 }
 
-// ── Vue loueur (démo) : visibilité + demandes reçues ──
-function AgencySettings({ st }) {
-  const pending = st.services.filter(s => s.status === 'envoyee' || s.status === 'acceptee')
+function Suivi({ back }) {
+  const items = getBoatHistory(owner, 10)
   return (
-    <div className="flex flex-col gap-4">
-      <Section icon={Eye} title="Ce que voit le propriétaire">
-        <p className="text-xs text-gray-500">Vous choisissez, bateau par bateau, ce que le propriétaire voit dans son espace.</p>
-        <div className="flex flex-col divide-y divide-gray-100">
-          {VISIBILITY_ITEMS.map(v => (
-            <label key={v.id} className="flex items-center gap-3 py-2.5 cursor-pointer">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-800">{v.label}</p>
-                <p className="text-[11px] text-gray-500">{v.hint}</p>
-              </div>
-              <input type="checkbox" className="sr-only peer" checked={st.visibility[v.id]} onChange={e => setVisibility(v.id, e.target.checked)} />
-              <span className="w-10 h-6 rounded-full bg-gray-200 peer-checked:bg-teal-400 relative transition-colors flex-shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-navy-400 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4" aria-hidden="true" />
-            </label>
-          ))}
-        </div>
-      </Section>
-
-      <Section icon={Wrench} title={`Demandes de ${DEMO_OWNER.name}`} aside={pending.length > 0 && <span className="pill-warn">{pending.length} à traiter</span>}>
-        <div className="flex flex-col gap-1.5">
-          {st.services.map(s => (
-            <div key={s.id} className="flex flex-wrap items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
-              <div className="flex-1 min-w-[180px]">
-                <p className="text-xs font-medium text-gray-800">{serviceLabel(s.type)}{s.date && <span className="font-normal text-gray-500"> · {fmtDate(s.date, true)}</span>}</p>
-                {s.note && <p className="text-[11px] text-gray-500">{s.note}</p>}
-              </div>
-              {s.status === 'envoyee' && <>
-                <button className="btn-ghost text-xs py-1" onClick={() => setServiceStatus(s.id, 'refusee')}><X size={12} /> Refuser</button>
-                <button className="btn-primary text-xs py-1" onClick={() => setServiceStatus(s.id, 'acceptee')}><Check size={12} /> Accepter</button>
-              </>}
-              {s.status === 'acceptee' && <button className="btn-primary text-xs py-1" onClick={() => setServiceStatus(s.id, 'faite')}><Check size={12} /> Marquer faite</button>}
-              {(s.status === 'faite' || s.status === 'refusee') && <span className={STATUS[s.status].cls}>{STATUS[s.status].label}</span>}
+    <div className="flex flex-col gap-5">
+      <BackButton onClick={back} />
+      <Title sub="Les dernières interventions sur votre bateau.">Suivi de mon bateau</Title>
+      <ul className="flex flex-col gap-2">
+        {items.map(m => (
+          <li key={m.key} className="rounded-2xl bg-white border border-gray-200 p-4 flex items-center gap-4">
+            <span className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${m.done ? 'bg-teal-400' : 'bg-gray-200'}`}>{m.done && <Check size={22} className="text-white" strokeWidth={3} />}</span>
+            <div>
+              <p className="text-lg text-gray-900">{m.label}</p>
+              <p className="text-base text-gray-500 first-letter:uppercase">{longDate(m.date)} · {m.by}</p>
             </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-gray-400">En production, une demande acceptée devient une mission (technicien ou société de ménage) et rejoint « À traiter ».</p>
-      </Section>
+          </li>
+        ))}
+        {items.length === 0 && <p className="text-lg text-gray-500">Rien pour l'instant.</p>}
+      </ul>
+    </div>
+  )
+}
 
-      <MessagesSection st={st} side="agency" />
+function Revenus({ back }) {
+  const r = getRevenue(owner, '2026')
+  const Line = ({ label, value, strong }) => (
+    <div className="flex items-baseline justify-between gap-4 py-3 border-t border-gray-100 first:border-0">
+      <span className="text-lg text-gray-700">{label}</span>
+      <span className={`text-xl ${strong ? 'font-bold text-gray-900' : 'text-gray-900'}`}>{value}</span>
+    </div>
+  )
+  return (
+    <div className="flex flex-col gap-5">
+      <BackButton onClick={back} />
+      <Title sub="Pour l'année 2026.">Mes revenus</Title>
+      <div className="rounded-2xl bg-white border border-gray-200 px-5 py-2">
+        <Line label="Nombre de locations" value={r.count} />
+        <Line label="Déjà gagné" value={eur(r.ownerPast)} />
+        <Line label="À venir (déjà réservé)" value={eur(r.ownerUpcoming)} />
+        <Line label="Total de l'année pour vous" value={eur(r.ownerTotal)} strong />
+      </div>
+      <p className="text-base text-gray-500">Votre part est de {Math.round(r.share * 100)} % du prix des locations, selon votre contrat avec Midi Nautisme. (Démo : montants fictifs.)</p>
     </div>
   )
 }
 
 export default function ProprietaireDashboard({ onLogout }) {
-  const [st, setSt] = useState(getOwnerState())
-  const [view, setView] = useState('owner') // 'owner' | 'agency' — bascule de démo uniquement
-  useEffect(() => subscribeOwner(setSt), [])
-  const boat = getOwnerBoat()
-  const v = st.visibility
-  const nothingVisible = !Object.values(v).some(Boolean)
+  const [screen, setScreen] = useState('home')
+  const [, refresh] = useState(0)
+  useEffect(() => subscribeOwner(() => refresh(v => v + 1)), [])
+  const go = s => { setScreen(s); window.scrollTo({ top: 0 }) }
+  const back = () => go('home')
+  const vis = getVisibility(owner.id)
+  getOwnerState() // abonné : chaque changement (par l'agence ou par lui) redessine l'écran
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-navy-900 text-white">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <span className="font-display text-lg font-bold tracking-tight">Hel<span className="text-teal-200">mo</span></span>
-          <span className="text-[11px] text-navy-100 hidden sm:inline">Espace propriétaire</span>
-          <div className="ml-auto flex items-center gap-2.5">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-medium">{DEMO_OWNER.name}</p>
-              <p className="text-[10px] text-navy-100">Propriétaire · géré par Midi Nautisme</p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-teal-400 flex items-center justify-center text-xs font-bold">{DEMO_OWNER.initials}</div>
-            <button onClick={onLogout} className="p-2 rounded hover:bg-navy-800" aria-label="Se déconnecter"><LogOut size={15} /></button>
-          </div>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <header className="bg-navy-900">
+        <div className="max-w-xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button type="button" onClick={back} className="font-display text-white text-xl font-bold tracking-tight">Hel<span className="text-teal-200">mo</span></button>
+          <span className="text-sm text-navy-100">Mon bateau</span>
+          <button type="button" onClick={onLogout} className="ml-auto flex items-center gap-2 min-h-[44px] px-3 rounded-lg text-base text-white hover:bg-navy-800"><LogOut size={18} /> Quitter</button>
         </div>
       </header>
-
-      {/* Bandeau de démo : signale les données fictives et permet de voir le côté loueur. */}
-      <div className="bg-amber-50 border-b border-amber-100">
-        <div className="max-w-5xl mx-auto px-4 py-2 flex flex-wrap items-center gap-2">
-          <p className="text-[11px] text-amber-800 flex-1 min-w-[220px]">Démo : propriétaire et données fictives. Rien n'est enregistré.</p>
-          <div className="flex bg-white rounded-lg border border-amber-200 p-0.5" role="tablist" aria-label="Choisir la vue">
-            {[['owner', 'Vue propriétaire'], ['agency', 'Réglages du loueur']].map(([id, label]) => (
-              <button key={id} role="tab" aria-selected={view === id} onClick={() => setView(id)} className={`text-[11px] px-3 py-1 rounded-md ${view === id ? 'bg-navy-600 text-white' : 'text-gray-600'}`}>{label}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-4 py-5 flex flex-col gap-4">
-        <div className="card flex flex-wrap items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-navy-50 flex items-center justify-center"><Anchor size={20} className="text-navy-600" /></div>
-          <div className="flex-1 min-w-[200px]">
-            <h1 className="font-display text-lg font-bold text-gray-900">{boat.name}</h1>
-            <p className="text-xs text-gray-500">{boat.modele} · {boat.annee} · {boat.length} m · {boat.cabines} cabines · {boat.port}</p>
-          </div>
-          <span className="pill-ok">En gestion chez Midi Nautisme</span>
-        </div>
-
-        {view === 'agency' ? <AgencySettings st={st} /> : (
-          <>
-            {nothingVisible && <p className="card text-sm text-gray-500 flex items-center gap-2"><EyeOff size={15} /> Le loueur n'a encore rien partagé avec vous.</p>}
-            <div className="grid gap-4 md:grid-cols-2 items-start">
-              <div className="flex flex-col gap-4">
-                {v.planning && <PlanningSection st={st} showAmounts={v.revenus} />}
-                {v.revenus && <RevenueSection />}
-              </div>
-              <div className="flex flex-col gap-4">
-                {v.services && <ServicesSection st={st} />}
-                {v.messages && <MessagesSection st={st} side="owner" />}
-                {v.missions && <MissionsSection />}
-              </div>
-            </div>
-          </>
-        )}
+      <p className="max-w-xl mx-auto px-4 pt-3 text-sm text-gray-500">Démo : propriétaire et données fictives.</p>
+      <main className="max-w-xl mx-auto px-4 pt-3 pb-10">
+        {screen === 'home' && <Home go={go} />}
+        {screen === 'reserver' && <Reserver back={back} />}
+        {screen === 'service' && <Service back={back} />}
+        {screen === 'messages' && <Messages back={back} />}
+        {screen === 'suivi' && (vis.suivi ? <Suivi back={back} /> : <Home go={go} />)}
+        {screen === 'revenus' && (vis.revenus ? <Revenus back={back} /> : <Home go={go} />)}
       </main>
     </div>
   )

@@ -4,6 +4,7 @@ import { AlertTriangle, Plus, ChevronRight, ArrowUpRight, ArrowDownLeft, Euro } 
 import { parseISO, addDays, format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BOATS, BOOKINGS, DOC_LABELS, CLIENTS } from '@/lib/mock-data'
+import { getAgencyOwnerAlerts, subscribeOwner } from '@/lib/owner-space'
 import WeekendRotation from '@/components/dashboard/WeekendRotation'
 import BookingDetail from '@/components/planning/BookingDetail'
 import MaintenanceModal from '@/components/planning/MaintenanceModal'
@@ -159,6 +160,8 @@ export default function Dashboard() {
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [sharedState, setSharedState] = useState(getState())
   useEffect(() => subscribe(s => setSharedState(s)), [])
+  const [, refreshOwners] = useState(0)
+  useEffect(() => subscribeOwner(() => refreshOwners(v => v + 1)), [])
   const [selectedContext, setSelectedContext] = useState('depart')
   const [gapInfo, setGapInfo] = useState(null) // { boat, booking, nextBooking } → fiche maintenance
   const [, forceDashboardUpdate] = useState(0) // force le recalcul des alertes après mutation d'un booking
@@ -206,6 +209,8 @@ export default function Dashboard() {
   const refusedMenages = getUnconfirmedMenages(activeBrand).filter(m => m.requestStatus === 'refusee')
   const brandBoatIds = boats.map(b => b.id)
   const unassignedTech = getUnassignedMissions().filter(m => brandBoatIds.includes(m.boatId))
+  // Propriétaires (gestion locative) : demandes de services et messages en attente.
+  const ownerAlerts = getAgencyOwnerAlerts(activeBrand)
 
   // ── Rotation du week-end (samedi de la semaine en cours) ──
   const saturdayInPeriod = currentWeekStart
@@ -266,11 +271,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="card flex items-center gap-4 cursor-pointer hover:shadow-card-hover transition-all duration-200" onClick={() => document.getElementById('a-traiter')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: incomplete.length > 0 ? '#FEF0F0' : '#E2F5EF' }}>
-              <AlertTriangle size={18} style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57' }} />
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: incomplete.length + ownerAlerts.length > 0 ? '#FEF0F0' : '#E2F5EF' }}>
+              <AlertTriangle size={18} style={{ color: incomplete.length + ownerAlerts.length > 0 ? '#B02020' : '#0F7D57' }} />
             </div>
             <div>
-              <p className="font-display text-2xl font-bold" style={{ color: incomplete.length > 0 ? '#B02020' : '#0F7D57', lineHeight: 1.1 }}>{incomplete.length + refusedMenages.length + (unassignedTech.length ? 1 : 0)}</p>
+              <p className="font-display text-2xl font-bold" style={{ color: incomplete.length + ownerAlerts.length > 0 ? '#B02020' : '#0F7D57', lineHeight: 1.1 }}>{incomplete.length + refusedMenages.length + (unassignedTech.length ? 1 : 0) + ownerAlerts.length}</p>
               <p className="text-xs text-gray-400 mt-0.5">À traiter</p>
             </div>
           </div>
@@ -280,7 +285,7 @@ export default function Dashboard() {
         <WeekendRotation saturday={saturdayInPeriod} returningBookings={returningBookings} onSelect={handleRotationSelect} />
 
         {/* Alertes uniquement — ce qui bloque vraiment */}
-        {(incomplete.length > 0 || refusedMenages.length > 0 || unassignedTech.length > 0) && (
+        {(incomplete.length > 0 || refusedMenages.length > 0 || unassignedTech.length > 0 || ownerAlerts.length > 0) && (
           <div className="mb-6 scroll-mt-4" id="a-traiter">
             <p className="section-label">À traiter</p>
             <div className="flex flex-col gap-2">
@@ -294,6 +299,16 @@ export default function Dashboard() {
                   <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Voir →</span>
                 </div>
               )}
+              {ownerAlerts.map(a => (
+                <div key={a.owner.id} className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/proprietaires')}>
+                  <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate text-amber-800">{a.boat?.name} — {a.owner.name} (propriétaire)</p>
+                    <p className="text-xs text-amber-700">{[a.pending.length && `${a.pending.length} demande${a.pending.length > 1 ? 's' : ''} de service à traiter`, a.unread && `${a.unread} message${a.unread > 1 ? 's' : ''} non lu${a.unread > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Voir →</span>
+                </div>
+              ))}
               {refusedMenages.map(m => (
                 <div key={m.key} className="flex items-center gap-3 rounded-xl p-3 border bg-amber-50 border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/menage')}>
                   <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />

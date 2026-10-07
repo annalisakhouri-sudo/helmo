@@ -17,6 +17,7 @@ import SkipperDashboard from '@/pages/SkipperDashboard'
 import TechnicienDashboard from '@/pages/TechnicienDashboard'
 import MenageDashboard from '@/pages/MenageDashboard'
 import ProprietaireDashboard from '@/pages/ProprietaireDashboard'
+import GestionLocative from '@/pages/GestionLocative'
 
 function AppWithAuth() {
   const [user, setUser] = useState(() => {
@@ -77,6 +78,7 @@ function AppWithAuth() {
         { path: 'options', element: <Options /> },
         { path: 'messagerie', element: <Messagerie /> },
         { path: 'facturation', element: <Facturation /> },
+        { path: 'proprietaires', element: <GestionLocative /> },
       ],
     },
   ])
