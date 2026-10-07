@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, Anchor, Wrench, Waves, Sparkles } from 'lucide-react'
+import { Building2, Anchor, Wrench, Waves, Sparkles, KeyRound } from 'lucide-react'
 
 const ROLES = [
   {
@@ -37,6 +37,16 @@ const ROLES = [
     color: '#0F7D57',
     bg: 'rgba(15,125,87,0.08)',
     border: 'rgba(15,125,87,0.15)',
+  },
+  {
+    // Démo uniquement (07/10/2026) : idée à tester avec Marie, pas encore dans le produit.
+    id: 'proprietaire',
+    label: 'Propriétaire',
+    sub: 'Démo : mon bateau, mes dates, mes demandes au loueur',
+    icon: KeyRound,
+    color: '#185FA5',
+    bg: 'rgba(24,95,165,0.06)',
+    border: 'rgba(24,95,165,0.15)',
   },
 ]
 

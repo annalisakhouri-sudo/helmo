@@ -16,6 +16,7 @@ import Login from '@/pages/Login'
 import SkipperDashboard from '@/pages/SkipperDashboard'
 import TechnicienDashboard from '@/pages/TechnicienDashboard'
 import MenageDashboard from '@/pages/MenageDashboard'
+import ProprietaireDashboard from '@/pages/ProprietaireDashboard'
 
 function AppWithAuth() {
   const [user, setUser] = useState(() => {
@@ -46,6 +47,11 @@ function AppWithAuth() {
   // Vue Ménage (société tierce sous-traitante)
   if (user?.role === 'menage') {
     return <MenageDashboard onLogout={handleLogout} />
+  }
+
+  // Vue Propriétaire (démo : services aux propriétaires, à tester avec Marie)
+  if (user?.role === 'proprietaire') {
+    return <ProprietaireDashboard onLogout={handleLogout} />
   }
 
   const router = createBrowserRouter([
